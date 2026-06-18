@@ -18,6 +18,11 @@ with **no backend required**, hosted on GitHub Pages.
   based on rarity, even while the app is closed (offline earnings, capped).
   Spend coins on upgrades (Habitat, Gilded Cages, Cozy Beds) to earn faster.
   This gives a reason to *hold* creatures rather than sell or wager them all.
+- **Prestige** — a persistent **Critterdex** tracks every species you've ever
+  owned. Discover all of the base creatures and you can prestige: your run
+  (creatures, coins, Ranch upgrades, dex) resets in exchange for a **permanent
+  +50% income** bonus that stacks every prestige. Collect them all again to
+  prestige higher.
 - **Casino games** where you wager **one or many** creatures at once. Their
   combined value is your stake, and each game rolls a payout multiplier — the
   bigger your stake, the rarer the creature you can win. Lose, and the whole

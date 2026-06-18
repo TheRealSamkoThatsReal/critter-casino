@@ -316,6 +316,28 @@ body {
   .egg-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
+/* ---- prestige ---- */
+.prestige-badge {
+  background: linear-gradient(180deg, #3a2a5e, #2a1e4a); color: #ffe14d; font-weight: 800; font-size: 13px;
+  padding: 6px 10px; border-radius: 999px; border: 1px solid #6c5cff;
+  box-shadow: 0 0 10px -2px #6c5cff;
+}
+.prestige-card {
+  background: linear-gradient(135deg, #2a1e4a, #1b1830); border: 1px solid #4a3f7a; border-radius: 16px;
+  padding: 14px; margin-bottom: 14px; position: relative; overflow: hidden;
+}
+.prestige-card.ready { border-color: #ffe14d; box-shadow: 0 0 22px -4px #ffe14d; }
+.prestige-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.prestige-title { font-size: 17px; font-weight: 800; }
+.prestige-lvl { background: #6c5cff; color: #fff; font-size: 12px; padding: 1px 8px; border-radius: 999px; margin-left: 4px; }
+.prestige-bonus { font-size: 13px; font-weight: 700; color: #ffe14d; }
+.prestige-sub { font-size: 12.5px; color: var(--muted); line-height: 1.4; margin: 6px 0 10px; }
+.pbar { height: 12px; background: #0e0c1a; border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+.pbar-fill { height: 100%; background: linear-gradient(90deg, #6c5cff, #ffe14d); border-radius: 999px; transition: width .4s; }
+.prestige-prog { font-size: 12px; color: var(--muted); text-align: center; margin: 6px 0 4px; }
+.prestige-card .gaction { margin-top: 10px; }
+.prestige-card .gaction .btn { width: 100%; }
+
 /* ---- ranch / idle ---- */
 .idle-stats { display: flex; gap: 8px; margin-bottom: 14px; }
 .idle-stat { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 12px;

@@ -13,6 +13,12 @@
     if (c) c.textContent = fmt(s.coins);
     const cnt = document.getElementById('inv-count');
     if (cnt) cnt.textContent = s.inv.length;
+    const pb = document.getElementById('prestige-badge');
+    if (pb) {
+      const lvl = G.state.prestigeLevel();
+      pb.hidden = lvl < 1;
+      pb.textContent = '✨ ' + lvl;
+    }
   }
 
   // ---- collection ----------------------------------------------------------

@@ -34,7 +34,7 @@
     if (!sp) return 0;
     let v = RATE[sp.tier] * (item.shiny ? 5 : 1);
     if (sp.tier >= 2) v *= rarityMult();
-    return v * habitatMult();
+    return v * habitatMult() * G.state.prestigeMult();
   }
   function incomePerSec() {
     return G.state.get().inv.reduce(function (a, it) { return a + creatureIncome(it); }, 0);
@@ -120,12 +120,61 @@
     render(document.getElementById('view'));
   }
 
+  // ---- prestige ------------------------------------------------------------
+  function confirmPrestige() {
+    if (!G.state.canPrestige()) return;
+    const next = G.state.prestigeLevel() + 1;
+    const bonus = Math.round((0.5 * next) * 100);
+    const node = el('div', {});
+    node.appendChild(el('p', { class: 'gdesc', html:
+      'Prestiging <b>resets</b> your creatures, coins, and Ranch upgrades — and clears your Critterdex.<br><br>' +
+      'In return you gain a <b>permanent +50% income</b> (total +' + bonus + '% after this), then collect them all again to prestige higher.' }));
+    const m = G.ui.modal('Prestige?', node);
+    node.appendChild(el('div', { class: 'gaction' }, [
+      el('button', { class: 'btn primary', text: '✨ Prestige', onclick: function () {
+        if (G.state.doPrestige()) {
+          G.ui.haptic([30, 50, 30, 50, 30, 50, 120]);
+          m.close();
+          toast('Prestige ' + G.state.prestigeLevel() + '! +' + bonus + '% permanent income.', 'good');
+          render(document.getElementById('view'));
+          if (window.refreshAll) window.refreshAll();
+        }
+      } }),
+      el('button', { class: 'btn', text: 'Cancel', onclick: function () { m.close(); } })
+    ]));
+  }
+
+  function prestigePanel(container) {
+    const p = G.state.dexProgress();
+    const level = G.state.prestigeLevel();
+    const pct = p.total ? Math.floor(p.have / p.total * 100) : 0;
+    const ready = G.state.canPrestige();
+    const card = el('div', { class: 'prestige-card' + (ready ? ' ready' : '') });
+    card.appendChild(el('div', { class: 'prestige-head' }, [
+      el('div', { class: 'prestige-title', html: '✨ Prestige' + (level ? ' <span class="prestige-lvl">Lv ' + level + '</span>' : '') }),
+      el('div', { class: 'prestige-bonus', text: level ? ('+' + Math.round((G.state.prestigeMult() - 1) * 100) + '% income') : 'no bonus yet' })
+    ]));
+    card.appendChild(el('div', { class: 'prestige-sub', text:
+      'Discover every base creature, then prestige to reset your run for +50% permanent income.' }));
+    const fill = el('div', { class: 'pbar-fill' });
+    fill.style.width = pct + '%';
+    card.appendChild(el('div', { class: 'pbar' }, [fill]));
+    card.appendChild(el('div', { class: 'prestige-prog', text: 'Critterdex: ' + p.have + ' / ' + p.total + ' (' + pct + '%)' }));
+    const btn = el('button', { class: 'btn primary', text: ready ? '✨ Prestige now' : '🔒 Collect them all to unlock' });
+    btn.disabled = !ready;
+    btn.addEventListener('click', confirmPrestige);
+    card.appendChild(el('div', { class: 'gaction' }, [btn]));
+    container.appendChild(card);
+  }
+
   // ---- Ranch view ----------------------------------------------------------
   function render(container) {
     container.innerHTML = '';
     container.appendChild(el('h2', { class: 'view-title', text: '🏡 Ranch' }));
     container.appendChild(el('p', { class: 'view-sub', text:
       'Your creatures earn coins over time based on rarity — even while the app is closed. Spend coins on upgrades to earn faster.' }));
+
+    prestigePanel(container);
 
     const s = G.state.get();
     container.appendChild(el('div', { class: 'idle-stats' }, [

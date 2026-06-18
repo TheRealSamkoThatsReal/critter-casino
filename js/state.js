@@ -11,9 +11,13 @@
     cooldowns: {},      // {free: timestamp}
     upgrades: {},       // idle upgrade levels {habitat, rarity, offline}
     lastTick: 0,        // timestamp of last income settle (for offline earnings)
+    discovered: {},     // Critterdex: every species id ever owned (persists across sell/gamble)
+    prestige: 0,        // number of times prestiged (permanent income multiplier)
     stats: { hatched: 0, gambled: 0, wins: 0, losses: 0, traded: 0 },
     seenAdmin: false
   };
+
+  const STARTERS = ['c_emberpup', 'c_drizzle', 'c_leaflet'];
 
   let counter = 0;
   let state = load();
@@ -24,6 +28,9 @@
       if (!raw) return seed(JSON.parse(JSON.stringify(def)));
       const s = Object.assign(JSON.parse(JSON.stringify(def)), JSON.parse(raw));
       if (!s.player.id) s.player.id = genId();
+      if (!s.discovered) s.discovered = {};
+      // migrate: credit anything currently owned to the Critterdex
+      (s.inv || []).forEach(function (it) { s.discovered[it.sid] = 1; });
       return s;
     } catch (e) {
       return seed(JSON.parse(JSON.stringify(def)));
@@ -32,9 +39,11 @@
 
   function seed(s) {
     s.player.id = genId();
+    s.discovered = s.discovered || {};
     // starter creatures so a new player has something to play with
-    ['c_emberpup', 'c_drizzle', 'c_leaflet'].forEach(function (sid) {
+    STARTERS.forEach(function (sid) {
       s.inv.push(mkInstance(sid));
+      s.discovered[sid] = 1;
     });
     return s;
   }
@@ -107,16 +116,21 @@
     return opts[Math.floor(Math.random() * opts.length)];
   }
 
+  // Critterdex: remember every species ever owned
+  function discover(sid) { if (sid) state.discovered[sid] = 1; }
+
   // inventory ops
   function addSpecies(sid, shiny) {
     const inst = mkInstance(sid, shiny);
     state.inv.push(inst);
+    discover(sid);
     save();
     return inst;
   }
   function addInstance(inst) {
     if (!inst.iid) inst.iid = genIid();
     state.inv.push(inst);
+    discover(inst.sid);
     save();
     return inst;
   }
@@ -135,6 +149,37 @@
   // the UI rounds for display.
   function addCoins(n) { state.coins = Math.max(0, state.coins + n); save(); }
 
+  // ---- prestige (collect every base creature -> reset for a permanent bonus)
+  // Completion is based on the built-in roster only, so admin-added creatures
+  // don't make the goal unreachable.
+  function dexProgress() {
+    const total = G.data.builtinRoster.length;
+    let have = 0;
+    G.data.builtinRoster.forEach(function (sp) { if (state.discovered[sp.id]) have++; });
+    return { have: have, total: total };
+  }
+  function canPrestige() {
+    const p = dexProgress();
+    return p.have >= p.total;
+  }
+  function prestigeLevel() { return state.prestige || 0; }
+  function prestigeMult() { return 1 + 0.5 * (state.prestige || 0); } // +50% income per prestige
+
+  function doPrestige() {
+    if (!canPrestige()) return false;
+    state.prestige = (state.prestige || 0) + 1;
+    // hard reset of the run, keeping identity, custom species, lifetime stats
+    state.inv = [];
+    state.coins = 250;
+    state.upgrades = {};
+    state.cooldowns = {};
+    state.discovered = {};
+    state.lastTick = Date.now();
+    STARTERS.forEach(function (sid) { state.inv.push(mkInstance(sid)); state.discovered[sid] = 1; });
+    save();
+    return true;
+  }
+
   G.state = {
     get: function () { return state; },
     save: save,
@@ -151,6 +196,11 @@
     addInstance: addInstance,
     removeInstance: removeInstance,
     getInstance: getInstance,
-    addCoins: addCoins
+    addCoins: addCoins,
+    dexProgress: dexProgress,
+    canPrestige: canPrestige,
+    prestigeLevel: prestigeLevel,
+    prestigeMult: prestigeMult,
+    doPrestige: doPrestige
   };
 })(window.G = window.G || {});
