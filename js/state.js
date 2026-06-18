@@ -9,6 +9,8 @@
     inv: [],            // [{iid, sid, shiny}]
     customSpecies: [],  // admin-added species
     cooldowns: {},      // {free: timestamp}
+    upgrades: {},       // idle upgrade levels {habitat, rarity, offline}
+    lastTick: 0,        // timestamp of last income settle (for offline earnings)
     stats: { hatched: 0, gambled: 0, wins: 0, losses: 0, traded: 0 },
     seenAdmin: false
   };
@@ -129,7 +131,9 @@
     return state.inv.find(function (x) { return x.iid === iid; }) || null;
   }
 
-  function addCoins(n) { state.coins = Math.max(0, Math.round(state.coins + n)); save(); }
+  // coins are kept as a float so sub-1/sec idle income isn't lost to rounding;
+  // the UI rounds for display.
+  function addCoins(n) { state.coins = Math.max(0, state.coins + n); save(); }
 
   G.state = {
     get: function () { return state; },

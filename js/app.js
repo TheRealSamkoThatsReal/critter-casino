@@ -32,7 +32,8 @@
     node.appendChild(el('div', { class: 'detail-meta', html:
       '<span class="pill r' + sp.tier + '">' + r.name + '</span> ' +
       '<span class="pill">' + sp.element + '</span> ' +
-      '<span class="pill">⛁ ' + fmt(G.state.valueOf(item)) + '</span>' }));
+      '<span class="pill">⛁ ' + fmt(G.state.valueOf(item)) + '</span> ' +
+      '<span class="pill">📈 ⛁ ' + G.idle.fmtRate(G.idle.creatureIncome(item)) + '/s</span>' }));
     const m = G.ui.modal(sp.name, node);
     node.appendChild(el('div', { class: 'gaction' }, [
       el('button', { class: 'btn', text: '💰 Sell for ⛁ ' + fmt(G.state.valueOf(item)), onclick: function () {
@@ -165,6 +166,7 @@
   // ---- navigation ----------------------------------------------------------
   const VIEWS = {
     collection: renderCollection,
+    ranch: function (c) { G.idle.render(c); },
     hatch: renderHatch,
     casino: function (c) { G.games.render(c); },
     trade: function (c) { G.trade.render(c); },
@@ -197,6 +199,7 @@
     });
     renderHeader();
     navigate('collection');
+    G.idle.init(); // start passive income + offline earnings
 
     // PWA install prompt
     let deferred = null;

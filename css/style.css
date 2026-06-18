@@ -316,6 +316,32 @@ body {
   .egg-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
+/* ---- ranch / idle ---- */
+.idle-stats { display: flex; gap: 8px; margin-bottom: 14px; }
+.idle-stat { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 6px; text-align: center; }
+.idle-stat b { display: block; font-size: 16px; color: #ffd75e; }
+.idle-stat span { font-size: 11px; color: var(--muted); }
+.idle-breakdown { display: flex; flex-direction: column; gap: 4px; }
+.bd-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 2px; }
+.bd-name { flex: 0 0 auto; font-size: 11px; padding: 2px 8px; }
+.bd-count { color: var(--muted); flex: 0 0 auto; }
+.bd-inc { margin-left: auto; color: #ffd75e; font-weight: 700; }
+.idle-upgrades { display: flex; flex-direction: column; gap: 10px; }
+.upgrade-tile { display: flex; align-items: center; gap: 12px; background: linear-gradient(180deg, var(--panel2), var(--bg2));
+  border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.up-icon { font-size: 30px; flex: 0 0 auto; }
+.up-main { flex: 1; min-width: 0; }
+.up-name { font-weight: 800; font-size: 14.5px; }
+.up-desc { font-size: 12px; color: var(--muted); line-height: 1.3; }
+.upgrade-tile .btn.small { flex: 0 0 auto; min-width: 84px; }
+.btn.small.primary { background: linear-gradient(180deg, var(--accent), #d83a76); border-color: transparent; color: #fff; }
+.offline-earn { font-size: 36px; font-weight: 900; color: #ffd75e; text-align: center; margin: 6px 0;
+  text-shadow: 0 0 18px rgba(255,215,94,.4); }
+
+/* eight nav items get a touch tighter */
+.navbtn .nl { font-size: 10px; }
+
 /* ---- eggs ---- */
 .egg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .egg-tile { background: linear-gradient(180deg, var(--panel), var(--bg2)); border: 1px solid var(--line);

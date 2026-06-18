@@ -14,6 +14,10 @@ with **no backend required**, hosted on GitHub Pages.
   Includes ✨ shiny variants worth 5×.
 - **Hatch eggs** to grow your collection; sell duplicates for coins to buy
   better eggs.
+- **Ranch (idle income)** — your creatures passively generate coins per second
+  based on rarity, even while the app is closed (offline earnings, capped).
+  Spend coins on upgrades (Habitat, Gilded Cages, Cozy Beds) to earn faster.
+  This gives a reason to *hold* creatures rather than sell or wager them all.
 - **Casino games** where you wager **one or many** creatures at once. Their
   combined value is your stake, and each game rolls a payout multiplier — the
   bigger your stake, the rarer the creature you can win. Lose, and the whole
