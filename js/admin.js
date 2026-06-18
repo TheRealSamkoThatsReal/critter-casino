@@ -13,18 +13,121 @@
     return box;
   }
 
+  // ---- 14x14 pixel sprite editor ------------------------------------------
+  // ref: {element, tier, spriteSeed} used for palette + procedural start.
+  // current: existing pixels array (or null). onSave(pixels|null).
+  function openEditor(ref, current, onSave) {
+    const SIZE = G.sprites.SIZE;
+    const palette = G.sprites.palette(ref);
+    const SLOTS = [
+      { k: '', label: 'Erase' },
+      { k: 'outline', label: 'Outline' },
+      { k: 'dark', label: 'Dark' },
+      { k: 'mid', label: 'Body' },
+      { k: 'light', label: 'Light' },
+      { k: 'accent', label: 'Accent' },
+      { k: 'eye', label: 'Eye' }
+    ];
+    let grid = current ? G.sprites.pixelsToGrid(current) : G.sprites.generatedGrid(ref);
+    let cur = 'mid', mirror = true, painting = false;
+
+    const cells = new Array(SIZE * SIZE);
+    const gridEl = el('div', { class: 'pix-grid' });
+    gridEl.style.gridTemplateColumns = 'repeat(' + SIZE + ', 1fr)';
+
+    function setCell(x, y) {
+      const c = cells[y * SIZE + x];
+      const css = G.sprites.keyColor(grid[y][x], palette);
+      c.style.background = css || '';
+      c.classList.toggle('on', !!grid[y][x]);
+    }
+    function paint(x, y) {
+      if (x < 0 || y < 0 || x >= SIZE || y >= SIZE) return;
+      grid[y][x] = cur; setCell(x, y);
+      if (mirror) { const mx = SIZE - 1 - x; grid[y][mx] = cur; setCell(mx, y); }
+    }
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        const c = el('div', { class: 'pix-cell' });
+        c.dataset.x = x; c.dataset.y = y;
+        cells[y * SIZE + x] = c;
+        gridEl.appendChild(c);
+        setCell(x, y);
+      }
+    }
+    function cellFromPoint(e) {
+      const t = document.elementFromPoint(e.clientX, e.clientY);
+      if (t && t.classList.contains('pix-cell')) paint(+t.dataset.x, +t.dataset.y);
+    }
+    gridEl.addEventListener('pointerdown', function (e) {
+      e.preventDefault(); painting = true;
+      if (e.target.classList.contains('pix-cell')) paint(+e.target.dataset.x, +e.target.dataset.y);
+    });
+    gridEl.addEventListener('pointermove', function (e) { if (painting) { e.preventDefault(); cellFromPoint(e); } });
+    window.addEventListener('pointerup', function () { painting = false; });
+    gridEl.addEventListener('pointerleave', function () { painting = false; });
+
+    // palette swatches
+    const sw = el('div', { class: 'pix-palette' });
+    const swatchEls = {};
+    SLOTS.forEach(function (s) {
+      const b = el('button', { class: 'pix-swatch' + (s.k === cur ? ' active' : ''), title: s.label });
+      const css = G.sprites.keyColor(s.k, palette);
+      if (s.k === '') b.classList.add('erase'); else b.style.background = css;
+      b.appendChild(el('span', { class: 'pix-swatch-l', text: s.label }));
+      b.addEventListener('click', function () {
+        cur = s.k;
+        Object.keys(swatchEls).forEach(function (k) { swatchEls[k].classList.toggle('active', k === cur); });
+      });
+      swatchEls[s.k] = b;
+      sw.appendChild(b);
+    });
+
+    const mirrorBtn = el('button', { class: 'btn small' + (mirror ? ' on' : ''), text: '🪞 Mirror: On' });
+    mirrorBtn.addEventListener('click', function () {
+      mirror = !mirror;
+      mirrorBtn.textContent = '🪞 Mirror: ' + (mirror ? 'On' : 'Off');
+      mirrorBtn.classList.toggle('on', mirror);
+    });
+    function refreshAllCells() { for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) setCell(x, y); }
+    const clearBtn = el('button', { class: 'btn small', text: '✕ Clear', onclick: function () {
+      grid = []; for (let y = 0; y < SIZE; y++) grid.push(new Array(SIZE).fill('')); refreshAllCells();
+    } });
+    const randBtn = el('button', { class: 'btn small', text: '🎲 Random', onclick: function () {
+      grid = G.sprites.generatedGrid({ element: ref.element, tier: ref.tier,
+        spriteSeed: 'r' + Math.floor(Math.random() * 1e9) }); refreshAllCells();
+    } });
+
+    const wrap = el('div', { class: 'pix-editor' }, [
+      el('p', { class: 'gdesc', text: 'Tap or drag to paint. Mirror keeps both halves symmetric. Colors follow the creature\'s element & rarity.' }),
+      sw,
+      gridEl,
+      el('div', { class: 'pix-tools' }, [mirrorBtn, randBtn, clearBtn])
+    ]);
+    const m = G.ui.modal('Sprite Editor (' + SIZE + '×' + SIZE + ')', wrap);
+    wrap.appendChild(el('div', { class: 'gaction' }, [
+      el('button', { class: 'btn primary', text: '✓ Save sprite', onclick: function () {
+        onSave(G.sprites.gridToPixels(grid)); m.close();
+      } }),
+      el('button', { class: 'btn', text: 'Use procedural instead', onclick: function () {
+        onSave(null); m.close();
+      } })
+    ]));
+  }
+
   function addForm(container) {
-    let draft = { id: '', name: '', element: 'Fire', tier: 0, spriteSeed: 'seed-1' };
+    let draft = { id: '', name: '', element: 'Fire', tier: 0, spriteSeed: 'seed-1', pixels: null };
     const preview = el('div', { class: 'admin-preview-wrap' });
     function redraw() {
       preview.innerHTML = '';
-      const sp = { id: 'preview', name: draft.name || 'New', element: draft.element, tier: draft.tier, spriteSeed: draft.spriteSeed };
+      const sp = { name: draft.name || 'New', element: draft.element, tier: draft.tier, spriteSeed: draft.spriteSeed, pixels: draft.pixels };
       // bust sprite cache for preview by using unique id each time
       sp.id = 'preview-' + draft.spriteSeed + '-' + draft.element + '-' + draft.tier;
       preview.appendChild(G.sprites.el(sp, 110));
       const r = G.data.rarity(draft.tier);
       preview.appendChild(el('div', { class: 'admin-prev-info', html:
-        '<b>' + (draft.name || 'Unnamed') + '</b><br>' + draft.element + ' • ' + r.name + ' • ⛁ ' + r.value }));
+        '<b>' + (draft.name || 'Unnamed') + '</b><br>' + draft.element + ' • ' + r.name + ' • ⛁ ' + r.value +
+        (draft.pixels ? '<br><span class="custom-tag">✏️ custom sprite</span>' : '') }));
     }
     const nameInp = el('input', { class: 'a-input', placeholder: 'Creature name' });
     nameInp.addEventListener('input', function () { draft.name = nameInp.value; redraw(); });
@@ -42,7 +145,11 @@
     let seedN = 1;
     const reroll = el('button', { class: 'btn', text: '🎲 Reroll sprite', onclick: function () {
       seedN++; draft.spriteSeed = 'seed-' + seedN + '-' + nameInp.value + '-' + Math.floor(Math.random() * 99999);
+      draft.pixels = null;
       redraw();
+    } });
+    const drawBtn = el('button', { class: 'btn', text: '✏️ Draw sprite', onclick: function () {
+      openEditor(draft, draft.pixels, function (pixels) { draft.pixels = pixels; redraw(); });
     } });
 
     const saveBtn = el('button', { class: 'btn primary', text: '＋ Add creature', onclick: function () {
@@ -54,6 +161,7 @@
       G.state.allSpecies().forEach(function (s) { existing[s.id] = 1; });
       while (existing[id]) { id = base + '-' + n++; }
       const sp = { id: id, name: name, element: draft.element, tier: draft.tier, spriteSeed: draft.spriteSeed || id, custom: true };
+      if (draft.pixels) sp.pixels = draft.pixels;
       G.state.get().customSpecies.push(sp);
       G.state.save();
       toast('Added ' + name + '!', 'good');
@@ -65,7 +173,7 @@
         el('label', { text: 'Name' }), nameInp,
         el('label', { text: 'Element' }), elSel,
         el('label', { text: 'Rarity' }), tierSel,
-        reroll
+        reroll, drawBtn
       ]),
       preview
     ]);
@@ -81,6 +189,15 @@
       const grid = el('div', { class: 'grid' });
       custom.slice().reverse().forEach(function (sp) {
         const c = G.ui.card({ iid: 'x', sid: sp.id, shiny: false }, { size: 56, showValue: true });
+        c.appendChild(el('button', { class: 'card-edit', text: '✏️', title: 'Edit sprite', onclick: function (e) {
+          e.stopPropagation();
+          openEditor(sp, sp.pixels, function (pixels) {
+            if (pixels) sp.pixels = pixels; else delete sp.pixels;
+            G.state.save(); render(document.getElementById('view'));
+            if (window.refreshAll) window.refreshAll();
+            toast('Sprite updated.', 'good');
+          });
+        } }));
         c.appendChild(el('button', { class: 'card-del', text: '🗑', onclick: function (e) {
           e.stopPropagation();
           const i = custom.indexOf(sp);

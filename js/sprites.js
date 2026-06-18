@@ -134,17 +134,51 @@
     return cell;
   }
 
-  // cache matrices/palettes by key
-  const cache = {};
-  function spriteData(creature) {
-    const key = creature.id;
-    if (cache[key]) return cache[key];
+  // --- custom pixel grids (hand-drawn in the admin editor) ------------------
+  // Stored compactly as an array of SIZE strings, one char per cell.
+  const KEY2CH = { '': '.', outline: 'o', dark: 'd', mid: 'm', light: 'l', accent: 'a', eye: 'e' };
+  const CH2KEY = { '.': '', o: 'outline', d: 'dark', m: 'mid', l: 'light', a: 'accent', e: 'eye' };
+
+  function gridToPixels(grid) {
+    const rows = [];
+    for (let y = 0; y < SIZE; y++) {
+      let s = '';
+      for (let x = 0; x < SIZE; x++) s += (KEY2CH[grid[y][x]] || '.');
+      rows.push(s);
+    }
+    return rows;
+  }
+  function pixelsToGrid(pixels) {
+    const grid = [];
+    for (let y = 0; y < SIZE; y++) {
+      const row = (pixels && pixels[y]) || '';
+      const r = [];
+      for (let x = 0; x < SIZE; x++) r.push(CH2KEY[row[x]] || '');
+      grid.push(r);
+    }
+    return grid;
+  }
+
+  function paletteOf(creature) {
     const seed = hashStr(creature.spriteSeed || creature.id);
     const rng = mulberry32(seed ^ 0x9e3779b9);
-    const data = {
-      matrix: generateMatrix(seed),
-      palette: buildPalette(rng, creature.element, creature.tier || 0)
-    };
+    return buildPalette(rng, creature.element, creature.tier || 0);
+  }
+  // fresh 2D key grid from the procedural generator (good editor starting point)
+  function generatedGrid(creature) {
+    return generateMatrix(hashStr(creature.spriteSeed || creature.id));
+  }
+
+  // cache matrices/palettes by key (procedural creatures only)
+  const cache = {};
+  function spriteData(creature) {
+    // hand-drawn sprite: never cached, so edits always show immediately
+    if (creature.pixels) {
+      return { matrix: pixelsToGrid(creature.pixels), palette: paletteOf(creature) };
+    }
+    const key = creature.id;
+    if (cache[key]) return cache[key];
+    const data = { matrix: generatedGrid(creature), palette: paletteOf(creature) };
     cache[key] = data;
     return data;
   }
@@ -197,5 +231,9 @@
     return c;
   }
 
-  G.sprites = { draw: draw, el: el, data: spriteData, SIZE: SIZE, hashStr: hashStr };
+  G.sprites = {
+    draw: draw, el: el, data: spriteData, SIZE: SIZE, hashStr: hashStr,
+    palette: paletteOf, keyColor: colorFor,
+    generatedGrid: generatedGrid, gridToPixels: gridToPixels, pixelsToGrid: pixelsToGrid
+  };
 })(window.G = window.G || {});

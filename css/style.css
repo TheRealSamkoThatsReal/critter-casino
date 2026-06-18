@@ -257,6 +257,29 @@ body {
 .admin-prev-info { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
 .panel .btn.primary { width: 100%; margin-top: 12px; }
 
+/* ---- pixel sprite editor ---- */
+.custom-tag { color: var(--accent); font-weight: 700; }
+.card-edit { position: absolute; bottom: 4px; left: 4px; background: #1c2b3a; color: #8fcfff;
+  border: 1px solid #2f5a6e; border-radius: 7px; font-size: 11px; padding: 1px 5px; cursor: pointer; line-height: 1.4; }
+.pix-editor { text-align: center; }
+.pix-palette { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 12px; }
+.pix-swatch { width: 46px; height: 40px; border-radius: 9px; border: 2px solid var(--line); cursor: pointer;
+  display: flex; align-items: flex-end; justify-content: center; padding: 2px; position: relative; }
+.pix-swatch.active { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+.pix-swatch.erase { background:
+  repeating-conic-gradient(#2c2750 0% 25%, #1b1830 0% 50%) 50% / 12px 12px; }
+.pix-swatch-l { font-size: 9px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.8);
+  background: rgba(0,0,0,.35); border-radius: 4px; padding: 0 3px; }
+.pix-grid { display: grid; gap: 1px; width: min(86vw, 322px); aspect-ratio: 1; margin: 0 auto;
+  background: #0e0c1a; border: 2px solid #4a3f7a; border-radius: 8px; padding: 3px;
+  touch-action: none; user-select: none; -webkit-user-select: none; }
+.pix-cell { aspect-ratio: 1; background: rgba(255,255,255,0.03);
+  box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.05); border-radius: 1px; }
+.pix-cell.on { box-shadow: none; }
+.pix-tools { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+.btn.small { padding: 8px 12px; font-size: 13px; border-radius: 10px; }
+.btn.small.on { background: var(--accent2); color: #fff; border-color: transparent; }
+
 /* ---- toasts ---- */
 .toasts { position: fixed; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 12px); left: 0; right: 0;
   z-index: 200; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
