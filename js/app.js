@@ -179,16 +179,54 @@
     admin: function (c) { G.admin.render(c); }
   };
 
+  function navOrder() {
+    return G.ui.$$('.navbtn').map(function (b) { return b.dataset.view; });
+  }
+
   function navigate(view) {
+    if (!VIEWS[view]) return;
+    const order = navOrder();
+    const dir = Math.sign(order.indexOf(view) - order.indexOf(current));
     current = view;
     if (cdTimer && view !== 'hatch') { clearInterval(cdTimer); cdTimer = null; }
     const c = document.getElementById('view');
     c.scrollTop = 0;
     window.scrollTo(0, 0);
     VIEWS[view](c);
+    if (dir !== 0) {
+      c.classList.remove('slide-l', 'slide-r');
+      void c.offsetWidth; // restart animation
+      c.classList.add(dir > 0 ? 'slide-l' : 'slide-r');
+    }
     G.ui.$$('.navbtn').forEach(function (b) {
       b.classList.toggle('active', b.dataset.view === view);
     });
+  }
+
+  // swipe left/right to move between adjacent tabs (mobile)
+  function initSwipe() {
+    const view = document.getElementById('view');
+    let sx = 0, sy = 0, st = 0, tracking = false;
+    view.addEventListener('touchstart', function (e) {
+      // ignore multi-touch, or when a modal / suspense overlay is on screen
+      if (e.touches.length !== 1 || document.querySelector('.overlay, .fx-suspense')) { tracking = false; return; }
+      const t = e.touches[0];
+      sx = t.clientX; sy = t.clientY; st = Date.now(); tracking = true;
+    }, { passive: true });
+    view.addEventListener('touchend', function (e) {
+      if (!tracking) return;
+      tracking = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx, dy = t.clientY - sy, dt = Date.now() - st;
+      if (dt > 600) return;                         // too slow to be a flick
+      if (Math.abs(dx) < 60) return;                // not far enough
+      if (Math.abs(dx) < Math.abs(dy) * 1.8) return; // too vertical (a scroll)
+      const order = navOrder();
+      const i = order.indexOf(current);
+      if (i < 0) return;
+      if (dx < 0 && i < order.length - 1) navigate(order[i + 1]);
+      else if (dx > 0 && i > 0) navigate(order[i - 1]);
+    }, { passive: true });
   }
 
   function refreshAll() {
@@ -205,6 +243,7 @@
     });
     renderHeader();
     navigate('collection');
+    initSwipe();
     G.idle.init(); // start passive income + offline earnings
     G.fx.init();   // arm audio on first gesture
 

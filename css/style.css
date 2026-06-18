@@ -21,6 +21,7 @@ body {
   color: var(--ink);
   min-height: 100vh;
   overscroll-behavior-y: contain;
+  overflow-x: hidden; /* avoid transient horizontal scroll from slide animations */
 }
 
 /* sprites pixelated */
@@ -60,6 +61,10 @@ body {
   padding: 14px 14px calc(var(--nav-h) + env(safe-area-inset-bottom) + 18px);
   max-width: 720px; margin: 0 auto;
 }
+.view.slide-l { animation: slide-l .22s ease; }
+.view.slide-r { animation: slide-r .22s ease; }
+@keyframes slide-l { from { transform: translateX(26px); opacity: .35; } to { transform: none; opacity: 1; } }
+@keyframes slide-r { from { transform: translateX(-26px); opacity: .35; } to { transform: none; opacity: 1; } }
 .view-title { margin: 6px 0 4px; font-size: 22px; }
 .view-sub { margin: 0 0 14px; color: var(--muted); font-size: 13.5px; line-height: 1.4; }
 
