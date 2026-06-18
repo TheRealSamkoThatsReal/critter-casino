@@ -195,6 +195,16 @@ body {
 .gaction .btn { min-width: 160px; }
 .gresult { font-size: 17px; font-weight: 800; }
 .gresult.good { color: var(--good); } .gresult.bad { color: var(--bad); }
+.gsub { font-size: 13px; color: var(--muted); margin-top: -4px; }
+
+/* wager picker */
+.wager-total { font-size: 15px; text-align: center; margin: 0 0 8px; }
+.wager-total b { color: #ffd75e; }
+.wager-tools { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 12px; }
+.payout-table { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; }
+.payout-row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 8px; border-bottom: 1px solid var(--line); }
+.po-mult { font-weight: 800; color: var(--good); }
+.po-mult.lose { color: var(--bad); }
 
 /* coin */
 .coin { width: 120px; height: 120px; position: relative; transform-style: preserve-3d; }

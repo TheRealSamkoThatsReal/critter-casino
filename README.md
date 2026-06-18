@@ -14,12 +14,15 @@ with **no backend required**, hosted on GitHub Pages.
   Includes ✨ shiny variants worth 5×.
 - **Hatch eggs** to grow your collection; sell duplicates for coins to buy
   better eggs.
-- **Casino games** where you wager a creature:
-  - **Coin Flip** – double-or-nothing climb to a higher rarity.
-  - **Lucky Wheel** – spin for up to +3 rarity tiers.
-  - **Slots** – match three to jump +2 rarities.
+- **Casino games** where you wager **one or many** creatures at once. Their
+  combined value is your stake, and each game rolls a payout multiplier — the
+  bigger your stake, the rarer the creature you can win. Lose, and the whole
+  wager is gone.
+  - **Coin Flip** – double or nothing on your whole stake.
+  - **Lucky Wheel** – spin for up to a ×10 jackpot.
+  - **Slots** – match symbols for up to ×8.
   - **High Roll** – dice with a safer middle ground.
-  - Odds get steeper at higher rarities, so reaching Divine is a real gamble.
+  - Pool a pile of commons for a real shot at an Epic, Mythic, or Divine.
 - **Player-to-player trading** via shareable codes (offer → accept → complete),
   with escrow and reclaim — no servers or accounts.
 - **Admin panel** (passcode: `admin`) to design and add new creatures with a

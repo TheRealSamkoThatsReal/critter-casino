@@ -1,79 +1,139 @@
-/* Casino games. Players wager a creature for a chance to upgrade or lose it. */
+/* Casino games. Players wager one OR MORE creatures; their combined value is
+ * the stake. Each game rolls a payout multiplier — the bigger your total
+ * stake, the higher the value you can win, so pooling creatures unlocks a
+ * shot at rarer prizes. Lose, and the whole wager is gone. */
 (function (G) {
   'use strict';
   const el = G.ui.el, toast = G.ui.toast, fmt = G.ui.fmt;
   const MAXT = G.data.RARITIES.length - 1;
 
-  // diminishing odds for climbing — top tiers are a real gamble
-  const CLIMB = [0.50, 0.45, 0.38, 0.30, 0.22, 0.12]; // chance to go tier t -> t+1
-  function climbChance(t) { return CLIMB[Math.min(t, CLIMB.length - 1)]; }
   function shiny() { return Math.random() < 0.03; }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function stakeOf(wager) { return wager.reduce(function (a, it) { return a + G.state.valueOf(it); }, 0); }
 
-  // Apply an outcome. delta: 'lose' | integer (0 keep, +n upgrade).
-  // Returns {lost} or {item}. Consumes the staked instance.
-  function resolve(staked, delta) {
-    G.state.removeInstance(staked.iid);
-    G.state.get().stats.gambled++;
-    if (delta === 'lose') {
-      G.state.get().stats.losses++;
-      G.state.save();
-      return { lost: true };
-    }
-    if (delta === 0) {
-      G.state.addInstance(staked); // returned unchanged
-      G.state.save();
-      return { item: staked, kept: true };
-    }
-    const sp = G.state.getSpecies(staked.sid);
-    const newTier = Math.min(MAXT, sp.tier + delta);
-    const ns = G.state.randomSpeciesAtTier(newTier) || sp;
-    const inst = G.state.addSpecies(ns.id, shiny());
-    G.state.get().stats.wins++;
-    G.state.save();
-    return { item: inst, upgraded: true };
+  // tier whose value the payout can "afford"
+  function tierForValue(v) {
+    let t = 0;
+    for (let i = 0; i <= MAXT; i++) if (G.data.rarity(i).value <= v) t = i;
+    return t;
   }
 
-  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  // Resolve a wager with a payout multiplier (0 = total loss).
+  // Consumes the whole wager; on a win awards ONE creature worth up to stake*mult.
+  function resolve(wager, mult) {
+    const stake = stakeOf(wager);
+    wager.forEach(function (it) { G.state.removeInstance(it.iid); });
+    G.state.get().stats.gambled++;
+    if (!mult || mult <= 0) {
+      G.state.get().stats.losses++;
+      G.state.save();
+      return { lost: true, count: wager.length, stake: stake };
+    }
+    const target = Math.round(stake * mult);
+    let tier = tierForValue(target);
+    if (Math.random() < 0.07) tier = Math.min(MAXT, tier + 1); // lucky crit
+    const sp = G.state.randomSpeciesAtTier(tier) || G.state.randomSpeciesAtTier(0);
+    const inst = G.state.addSpecies(sp.id, shiny());
+    G.state.get().stats.wins++;
+    G.state.save();
+    return { item: inst, count: wager.length, stake: stake, mult: mult, target: target };
+  }
 
-  // ---- creature picker -----------------------------------------------------
-  function chooseCreature(cb) {
+  // ---- multi-creature wager picker ----------------------------------------
+  function chooseWager(cb) {
     const inv = G.state.get().inv.slice().sort(function (a, b) {
-      return G.state.valueOf(b) - G.state.valueOf(a);
+      return G.state.valueOf(a) - G.state.valueOf(b); // cheapest first
     });
     if (!inv.length) { toast('You have no creatures to wager!', 'bad'); return; }
+    const selected = {}, cardByIid = {};
     const grid = el('div', { class: 'grid pick-grid' });
-    const m = G.ui.modal('Choose a creature to wager', grid);
+
+    function setSel(item, on) {
+      if (on) selected[item.iid] = item; else delete selected[item.iid];
+      cardByIid[item.iid].classList.toggle('selected', on);
+    }
+    function countSel() { return Object.keys(selected).length; }
+    function addCheapest(n) {
+      let added = 0;
+      for (let i = 0; i < inv.length && added < n; i++) {
+        if (!selected[inv[i].iid]) { setSel(inv[i], true); added++; }
+      }
+      update();
+    }
+    function clearAll() {
+      Object.keys(selected).forEach(function (k) { cardByIid[k].classList.remove('selected'); delete selected[k]; });
+      update();
+    }
     inv.forEach(function (item) {
-      grid.appendChild(G.ui.card(item, {
-        size: 56, onClick: function () { m.close(); cb(item); }
-      }));
+      const c = G.ui.card(item, { size: 54, onClick: function () { setSel(item, !selected[item.iid]); update(); } });
+      cardByIid[item.iid] = c;
+      grid.appendChild(c);
     });
+
+    const info = el('div', { class: 'wager-total' });
+    const goBtn = el('button', { class: 'btn primary' });
+    function update() {
+      const items = Object.keys(selected).map(function (k) { return selected[k]; });
+      const total = stakeOf(items);
+      info.innerHTML = 'Wagering <b>' + items.length + '</b> · stake <b>⛁ ' + fmt(total) + '</b>';
+      goBtn.disabled = !items.length;
+      goBtn.textContent = items.length ? ('Wager ⛁ ' + fmt(total)) : 'Select creatures';
+    }
+    const tools = el('div', { class: 'wager-tools' }, [
+      el('button', { class: 'btn small', text: '+5 cheapest', onclick: function () { addCheapest(5); } }),
+      el('button', { class: 'btn small', text: '+10 cheapest', onclick: function () { addCheapest(10); } }),
+      el('button', { class: 'btn small', text: 'Clear', onclick: clearAll })
+    ]);
+    const wrap = el('div', {}, [
+      el('p', { class: 'gdesc', text: 'Pick creatures to wager — their combined value is your stake. Bigger stakes can win rarer creatures!' }),
+      info, tools, grid
+    ]);
+    const m = G.ui.modal('Choose your wager', wrap);
+    wrap.appendChild(el('div', { class: 'gaction' }, [goBtn]));
+    goBtn.addEventListener('click', function () {
+      const items = Object.keys(selected).map(function (k) { return selected[k]; });
+      if (!items.length) return;
+      m.close(); cb(items);
+    });
+    update();
   }
 
   // ---- shared result panel -------------------------------------------------
   function showResult(res, container, onAgain) {
     container.innerHTML = '';
     if (res.lost) {
-      container.appendChild(el('div', { class: 'gresult bad', html: '💀 Gone! Your creature was lost.' }));
-    } else if (res.kept) {
-      container.appendChild(el('div', { class: 'gresult', html: '😌 Safe — you keep your creature.' }));
-      container.appendChild(G.ui.card(res.item, { size: 64 }));
+      container.appendChild(el('div', { class: 'gresult bad', html:
+        '💀 Lost! Your wager of ' + res.count + ' creature' + (res.count > 1 ? 's' : '') + ' (⛁ ' + fmt(res.stake) + ') is gone.' }));
     } else {
-      container.appendChild(el('div', { class: 'gresult good', html: '🎉 Upgraded!' }));
-      container.appendChild(G.ui.card(res.item, { size: 80 }));
+      const sp = G.state.getSpecies(res.item.sid);
+      const r = G.data.rarity(sp.tier);
+      container.appendChild(el('div', { class: 'gresult good', html:
+        '🎉 ×' + res.mult + ' → won a <b>' + r.name + '</b>!' }));
+      container.appendChild(G.ui.card(res.item, { size: 84 }));
+      container.appendChild(el('div', { class: 'gsub', html:
+        'Staked ⛁ ' + fmt(res.stake) + ' → payout ⛁ ' + fmt(res.target) }));
     }
     container.appendChild(el('button', { class: 'btn primary', text: 'Play again', onclick: onAgain }));
     if (window.refreshAll) window.refreshAll();
   }
 
+  function payoutTable(rows) {
+    const t = el('div', { class: 'payout-table' });
+    rows.forEach(function (r) {
+      t.appendChild(el('div', { class: 'payout-row' }, [
+        el('span', { class: 'po-out', text: r[0] }),
+        el('span', { class: 'po-mult' + (r[1] === 'LOSE' ? ' lose' : ''), text: r[1] })
+      ]));
+    });
+    return t;
+  }
+
   // ---- Coin Flip (Double or Nothing) --------------------------------------
-  function coinFlip(item) {
-    const sp = G.state.getSpecies(item.sid);
-    const chance = climbChance(sp.tier);
+  function coinFlip(wager) {
+    const stake = stakeOf(wager);
     const wrap = el('div', { class: 'game coinflip' });
     wrap.appendChild(el('p', { class: 'gdesc', html:
-      'Heads upgrades <b>' + sp.name + '</b> to a higher rarity. Tails and it\'s lost forever.<br>' +
-      'Win chance: <b>' + Math.round(chance * 100) + '%</b>' }));
+      'Heads <b>doubles</b> your ⛁ ' + fmt(stake) + ' stake into a new creature. Tails and it\'s all lost. 50/50.' }));
     const stage = el('div', { class: 'gstage' });
     const coin = el('div', { class: 'coin' }, [
       el('div', { class: 'coin-face heads', text: '⛀' }),
@@ -88,36 +148,35 @@
     const m = G.ui.modal('Coin Flip', wrap);
     flipBtn.addEventListener('click', function () {
       flipBtn.disabled = true;
-      const win = Math.random() < chance;
+      const win = Math.random() < 0.5;
       coin.classList.add('flipping');
       coin.style.setProperty('--end', win ? '0deg' : '180deg');
       setTimeout(function () {
         coin.className = 'coin ' + (win ? 'show-heads' : 'show-tails');
-        const res = resolve(item, win ? 1 : 'lose');
+        const res = resolve(wager, win ? 2 : 0);
         showResult(res, action, function () { m.close(); coinFlip2(); });
       }, 1700);
     });
   }
-  function coinFlip2() { chooseCreature(coinFlip); }
+  function coinFlip2() { chooseWager(coinFlip); }
 
   // ---- Lucky Wheel ---------------------------------------------------------
   const WHEEL = [
-    { label: 'LOSE', delta: 'lose', w: 26, color: '#e0413f' },
-    { label: 'KEEP', delta: 0, w: 22, color: '#6b7280' },
-    { label: '+1', delta: 1, w: 24, color: '#3d8bff' },
-    { label: 'LOSE', delta: 'lose', w: 14, color: '#b8302e' },
-    { label: '+2', delta: 2, w: 9, color: '#b15cff' },
-    { label: 'KEEP', delta: 0, w: 3, color: '#6b7280' },
-    { label: '+3', delta: 3, w: 2, color: '#ff9b21' }
+    { label: 'LOSE', mult: 0, w: 40, color: '#e0413f' },
+    { label: '×1.5', mult: 1.5, w: 24, color: '#3d8bff' },
+    { label: '×2', mult: 2, w: 18, color: '#4caf50' },
+    { label: 'LOSE', mult: 0, w: 9, color: '#b8302e' },
+    { label: '×3', mult: 3, w: 5, color: '#b15cff' },
+    { label: '×5', mult: 5, w: 3, color: '#ff9b21' },
+    { label: 'JACKPOT', mult: 10, w: 1, color: '#ffe14d' }
   ];
-  function wheelGame(item) {
-    const sp = G.state.getSpecies(item.sid);
+  function wheelGame(wager) {
+    const stake = stakeOf(wager);
     const wrap = el('div', { class: 'game wheelgame' });
     wrap.appendChild(el('p', { class: 'gdesc', html:
-      'Spin to decide the fate of <b>' + sp.name + '</b>. Land on +1/+2/+3 to climb rarities!' }));
+      'Spin to multiply your ⛁ ' + fmt(stake) + ' stake. Land JACKPOT for a ×10 payout!' }));
     const stage = el('div', { class: 'gstage' });
     const wheel = el('div', { class: 'wheel' });
-    // build conic gradient + labels
     let total = WHEEL.reduce(function (a, s) { return a + s.w; }, 0);
     let acc = 0; const stops = []; const segMid = [];
     WHEEL.forEach(function (s) {
@@ -141,78 +200,69 @@
     let rot = 0;
     spinBtn.addEventListener('click', function () {
       spinBtn.disabled = true;
-      // weighted pick
       let r = Math.random() * total, idx = 0;
       for (let i = 0; i < WHEEL.length; i++) { r -= WHEEL[i].w; if (r <= 0) { idx = i; break; } }
-      const target = 360 - segMid[idx] + (5 * 360); // pointer at top
-      rot += target;
+      const targetDeg = 360 - segMid[idx] + (5 * 360);
+      rot += targetDeg;
       wheel.style.transition = 'transform 3.4s cubic-bezier(.17,.67,.2,1)';
       wheel.style.transform = 'rotate(' + rot + 'deg)';
       setTimeout(function () {
-        const res = resolve(item, WHEEL[idx].delta);
+        const res = resolve(wager, WHEEL[idx].mult);
         showResult(res, action, function () { m.close(); wheelGame2(); });
       }, 3500);
     });
   }
-  function wheelGame2() { chooseCreature(wheelGame); }
+  function wheelGame2() { chooseWager(wheelGame); }
 
   // ---- Slots ---------------------------------------------------------------
-  const SYMS = ['🔥', '💧', '🌿', '⚡', '❄', '⭐'];
-  function slots(item) {
-    const sp = G.state.getSpecies(item.sid);
+  const SYMS = ['🔥', '💧', '🌿', '⚡', '❄'];
+  const STAR = '⭐';
+  function slots(wager) {
+    const stake = stakeOf(wager);
     const wrap = el('div', { class: 'game slots' });
     wrap.appendChild(el('p', { class: 'gdesc', html:
-      'Three matching symbols upgrade <b>' + sp.name + '</b>. Two matching keeps it safe. ' +
-      'All different and it\'s lost!' }));
+      'Spin your ⛁ ' + fmt(stake) + ' stake. ⭐⭐⭐ pays ×8, any three ×3, two matching ×1.5, all different loses.' }));
     const reels = el('div', { class: 'reels' });
     const cells = [];
-    for (let i = 0; i < 3; i++) {
-      const c = el('div', { class: 'reel', text: '❔' });
-      cells.push(c); reels.appendChild(c);
-    }
+    for (let i = 0; i < 3; i++) { const c = el('div', { class: 'reel', text: '❔' }); cells.push(c); reels.appendChild(c); }
     wrap.appendChild(reels);
     const action = el('div', { class: 'gaction' });
     const btn = el('button', { class: 'btn primary', text: 'Spin!' });
     action.appendChild(btn); wrap.appendChild(action);
     const m = G.ui.modal('Slots', wrap);
+    const ALL = SYMS.concat([STAR]);
     btn.addEventListener('click', function () {
       btn.disabled = true;
-      // decide outcome with weighting, then back out symbols
       const roll = Math.random();
-      let result; // 'three','two','none'
-      const triple = 0.04 + 0.08 * Math.max(0, (5 - sp.tier)) / 5; // harder at high tier
-      if (roll < triple) result = 'three';
-      else if (roll < triple + 0.42) result = 'two';
-      else result = 'none';
-      let final;
-      if (result === 'three') { const s = pick(SYMS); final = [s, s, s]; }
-      else if (result === 'two') { const s = pick(SYMS); let o = pick(SYMS); while (o === s) o = pick(SYMS); final = pick([[s, s, o], [s, o, s], [o, s, s]]); }
-      else { const a = pick(SYMS); let b = pick(SYMS); while (b === a) b = pick(SYMS); let c = pick(SYMS); while (c === a || c === b) c = pick(SYMS); final = [a, b, c]; }
+      let cat, mult, final;
+      if (roll < 0.02) { cat = 'jackpot'; mult = 8; final = [STAR, STAR, STAR]; }
+      else if (roll < 0.08) { cat = 'three'; mult = 3; const s = pick(SYMS); final = [s, s, s]; }
+      else if (roll < 0.46) { cat = 'two'; mult = 1.5; const s = pick(SYMS); let o = pick(ALL); while (o === s) o = pick(ALL); final = pick([[s, s, o], [s, o, s], [o, s, s]]); }
+      else { cat = 'none'; mult = 0; const a = pick(ALL); let b = pick(ALL); while (b === a) b = pick(ALL); let c = pick(ALL); while (c === a || c === b) c = pick(ALL); final = [a, b, c]; }
       let spins = 0;
       const iv = setInterval(function () {
-        cells.forEach(function (c) { c.textContent = pick(SYMS); });
+        cells.forEach(function (c) { c.textContent = pick(ALL); });
         spins++;
         if (spins > 14) {
           clearInterval(iv);
           cells.forEach(function (c, i) { c.textContent = final[i]; c.classList.add('settle'); });
-          const delta = result === 'three' ? 2 : result === 'two' ? 0 : 'lose';
           setTimeout(function () {
-            const res = resolve(item, delta);
+            const res = resolve(wager, mult);
             showResult(res, action, function () { m.close(); slots2(); });
           }, 500);
         }
       }, 90);
     });
   }
-  function slots2() { chooseCreature(slots); }
+  function slots2() { chooseWager(slots); }
 
   // ---- Dice (High Roll) ----------------------------------------------------
-  function dice(item) {
-    const sp = G.state.getSpecies(item.sid);
+  function dice(wager) {
+    const stake = stakeOf(wager);
     const wrap = el('div', { class: 'game dice' });
     wrap.appendChild(el('p', { class: 'gdesc', html:
-      'Roll two dice. <b>11-12</b>: big upgrade (+2). <b>8-10</b>: upgrade (+1). ' +
-      '<b>4-7</b>: safe. <b>2-3</b>: lost.' }));
+      'Roll two dice with your ⛁ ' + fmt(stake) + ' stake. <b>12</b>: ×4. <b>10-11</b>: ×2.5. ' +
+      '<b>7-9</b>: ×1.5. <b>2-6</b>: lost.' }));
     const stage = el('div', { class: 'gstage dicestage' });
     const d1 = el('div', { class: 'die', text: '⚀' });
     const d2 = el('div', { class: 'die', text: '⚀' });
@@ -233,32 +283,30 @@
           clearInterval(iv);
           d1.textContent = faces[a - 1]; d2.textContent = faces[b - 1];
           const sum = a + b;
-          let delta = sum >= 11 ? 2 : sum >= 8 ? 1 : sum >= 4 ? 0 : 'lose';
-          // soften high-tier upgrades
-          if (delta > 0 && sp.tier >= 4 && Math.random() < 0.45) delta = 0;
+          const mult = sum === 12 ? 4 : sum >= 10 ? 2.5 : sum >= 7 ? 1.5 : 0;
           setTimeout(function () {
-            const res = resolve(item, delta);
+            const res = resolve(wager, mult);
             showResult(res, action, function () { m.close(); dice2(); });
           }, 500);
         }
       }, 90);
     });
   }
-  function dice2() { chooseCreature(dice); }
+  function dice2() { chooseWager(dice); }
 
   // ---- lobby ---------------------------------------------------------------
   const GAMES = [
-    { id: 'coin', name: 'Coin Flip', icon: '⛀', desc: 'Double or nothing. High risk climb.', fn: coinFlip2 },
-    { id: 'wheel', name: 'Lucky Wheel', icon: '🎡', desc: 'Spin for upgrades up to +3 tiers.', fn: wheelGame2 },
-    { id: 'slots', name: 'Slots', icon: '🎰', desc: 'Match three to jump +2 rarities.', fn: slots2 },
-    { id: 'dice', name: 'High Roll', icon: '🎲', desc: 'Roll the dice. Safer middle ground.', fn: dice2 }
+    { id: 'coin', name: 'Coin Flip', icon: '⛀', desc: 'Double or nothing on your whole stake.', fn: coinFlip2 },
+    { id: 'wheel', name: 'Lucky Wheel', icon: '🎡', desc: 'Spin for up to ×10 on your stake.', fn: wheelGame2 },
+    { id: 'slots', name: 'Slots', icon: '🎰', desc: 'Match symbols for up to ×8.', fn: slots2 },
+    { id: 'dice', name: 'High Roll', icon: '🎲', desc: 'Roll the dice — safer middle ground.', fn: dice2 }
   ];
 
   function render(container) {
     container.innerHTML = '';
     container.appendChild(el('h2', { class: 'view-title', text: '🎲 Casino' }));
     container.appendChild(el('p', { class: 'view-sub', text:
-      'Wager a creature for a chance at a rarer one — or lose it. The house always watches.' }));
+      'Wager one or many creatures — their combined value is your stake. Win bigger by betting bigger… or lose it all.' }));
     const grid = el('div', { class: 'game-lobby' });
     GAMES.forEach(function (g) {
       const c = el('div', { class: 'game-tile clickable', onclick: g.fn }, [
