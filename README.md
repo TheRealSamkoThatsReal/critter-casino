@@ -11,9 +11,11 @@ with **no backend required**, hosted on GitHub Pages.
   Epic → Legendary → Mythic → Divine → Celestial → Astral → Ethereal →
   Primordial → Eternal → Omega. The tiers above Divine are ultra-rare chase
   items (Omega is worth millions). Each creature's value scales with rarity.
-- **SFX + VFX** — pulling a Rare or better fires a synthesized Web Audio chime
-  (grander the rarer it is, no audio files needed) and a confetti + shockwave
-  burst. A mute toggle lives in the top bar.
+- **SFX + VFX** — pulling a Rare or better plays a Vampire-Survivors-style
+  suspense build-up first (god-rays, a shaking mystery orb cycling sprites, a
+  rising riser tone, all scaling in length/intensity with rarity — ~1.4s for a
+  Rare up to ~5s for an Omega), then bursts into a synthesized Web Audio chime
+  and a confetti + shockwave reveal. A mute toggle lives in the top bar.
 - **Procedural pixel-art sprites** — every creature's sprite is generated
   deterministically from its id, so the roster can grow without art files.
   Includes ✨ shiny variants worth 5×.

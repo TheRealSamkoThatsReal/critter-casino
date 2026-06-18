@@ -116,6 +116,114 @@
     requestAnimationFrame(step);
   }
 
+  // ---- suspense build-up (Vampire-Survivors-style reveal) ------------------
+  function hexRgb(h) {
+    h = (h || '#ffffff').replace('#', '');
+    if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+    const n = parseInt(h, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function lerpColor(a, b, t) {
+    return 'rgb(' + Math.round(a[0] + (b[0] - a[0]) * t) + ',' +
+      Math.round(a[1] + (b[1] - a[1]) * t) + ',' + Math.round(a[2] + (b[2] - a[2]) * t) + ')';
+  }
+  // a rising "riser" tone + accelerating ticks for the duration of the build-up
+  function riser(durMs, tier) {
+    const c = ctx(); if (!c || isMuted()) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'sawtooth'; o.connect(g); g.connect(c.destination);
+    const t = c.currentTime, end = t + durMs / 1000;
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(150 + 90 * tier, end);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05, t + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.14, end - 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, end + 0.05);
+    o.start(t); o.stop(end + 0.1);
+    let tk = 0.15;
+    while (tk < durMs / 1000 - 0.05) {
+      tone(880 + Math.random() * 260, tk, 0.05, 'square', 0.05);
+      tk += Math.max(0.05, 0.34 * (1 - tk / (durMs / 1000)));
+    }
+  }
+
+  // Play a suspenseful build-up, then call onDone() to do the actual reveal.
+  // Only kicks in for Rare (tier>=2)+, scaling length/intensity with rarity.
+  function suspense(tier, onDone) {
+    if (tier == null || tier < 2 || !G.data || !G.sprites) { if (onDone) onDone(); return; }
+    const dur = Math.min(4500, 1100 + (tier - 2) * 350);
+    const rcol = hexRgb(G.data.rarity(tier).color), white = [255, 255, 255];
+    const W = window.innerWidth, H = window.innerHeight, dpr = window.devicePixelRatio || 1;
+
+    const wrap = document.createElement('div'); wrap.className = 'fx-suspense';
+    const cv = document.createElement('canvas'); cv.className = 'fx-suspense-canvas';
+    cv.width = (W + 60) * dpr; cv.height = (H + 60) * dpr;
+    cv.style.width = (W + 60) + 'px'; cv.style.height = (H + 60) + 'px';
+    wrap.appendChild(cv);
+    const orb = document.createElement('div'); orb.className = 'fx-orb';
+    const sCanvas = document.createElement('canvas'); orb.appendChild(sCanvas);
+    const q = document.createElement('div'); q.className = 'fx-q'; q.textContent = '?'; orb.appendChild(q);
+    wrap.appendChild(orb);
+    document.body.appendChild(wrap);
+
+    const x = cv.getContext('2d'); x.scale(dpr, dpr);
+    const cx = (W + 60) / 2, cy = (H + 60) / 2;
+    const species = G.state.allSpecies();
+    const rays = 10 + tier * 2;
+    let start = null, lastSwap = 0, swapEvery = 55;
+
+    riser(dur, tier);
+    if (G.ui && G.ui.haptic) G.ui.haptic(Math.min(800, dur));
+
+    function frame(ts) {
+      if (start == null) start = ts;
+      const p = Math.min(1, (ts - start) / dur);
+      const ct = Math.max(0, (p - 0.45) / 0.55);      // color reveal in the 2nd half
+      const col = lerpColor(white, rcol, ct);
+      const amp = (p * p) * (5 + tier);
+      const sx = (Math.random() - 0.5) * amp, sy = (Math.random() - 0.5) * amp;
+      cv.style.transform = 'translate(' + sx + 'px,' + sy + 'px)';
+
+      x.clearRect(0, 0, W + 60, H + 60);
+      x.save(); x.translate(cx, cy); x.rotate(ts / 700);
+      const len = Math.max(W, H);
+      for (let i = 0; i < rays; i++) {
+        x.rotate(Math.PI * 2 / rays);
+        const spread = 0.10 + 0.05 * Math.sin(ts / 200 + i);
+        x.beginPath(); x.moveTo(0, 0);
+        x.lineTo(Math.cos(-spread) * len, Math.sin(-spread) * len);
+        x.lineTo(Math.cos(spread) * len, Math.sin(spread) * len);
+        x.closePath();
+        x.globalAlpha = 0.05 + 0.16 * p; x.fillStyle = col; x.fill();
+      }
+      x.restore();
+
+      const s = 0.75 + 0.45 * p + 0.08 * Math.sin(ts / 70 * (1 + p));
+      orb.style.transform = 'translate(' + sx + 'px,' + sy + 'px) scale(' + s + ')';
+      orb.style.boxShadow = '0 0 ' + (20 + 90 * p) + 'px ' + (4 + 30 * p) + 'px ' + col;
+      orb.style.borderColor = col;
+      q.style.opacity = String(1 - ct);
+
+      if (ts - lastSwap > swapEvery) {
+        lastSwap = ts; swapEvery = 38 + p * p * 360;
+        const sp = species[Math.floor(Math.random() * species.length)];
+        G.sprites.draw(sCanvas, sp, 92);
+        sCanvas.style.opacity = String(0.45 + 0.55 * ct);
+      }
+      if (p < 1) requestAnimationFrame(frame); else finish();
+    }
+    function finish() {
+      wrap.remove();
+      const flash = document.createElement('div'); flash.className = 'fx-flash';
+      flash.style.background = lerpColor(white, rcol, 0.25);
+      document.body.appendChild(flash);
+      requestAnimationFrame(function () { flash.style.opacity = '0'; });
+      setTimeout(function () { flash.remove(); }, 380);
+      if (onDone) onDone();
+    }
+    requestAnimationFrame(frame);
+  }
+
   // ---- public --------------------------------------------------------------
   // Celebrate getting a creature of the given rarity tier.
   function celebrate(tier) {
@@ -136,6 +244,6 @@
     window.addEventListener('touchstart', unlock, { once: true });
   }
 
-  G.fx = { celebrate: celebrate, sound: sound, burst: burst, init: init,
+  G.fx = { celebrate: celebrate, sound: sound, burst: burst, suspense: suspense, init: init,
     isMuted: isMuted, toggleMute: toggleMute };
 })(window.G = window.G || {});

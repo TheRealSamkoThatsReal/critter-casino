@@ -104,16 +104,21 @@
   function reveal(item, headline) {
     const sp = G.state.getSpecies(item.sid);
     const r = G.data.rarity(sp.tier);
-    const node = el('div', { class: 'reveal r' + sp.tier });
-    node.style.setProperty('--rcolor', r.color);
-    node.appendChild(el('div', { class: 'reveal-head', text: headline || 'You got…' }));
-    const big = el('div', { class: 'reveal-sprite' });
-    big.appendChild(G.sprites.el(sp, 140));
-    node.appendChild(big);
-    node.appendChild(el('div', { class: 'reveal-name', text: (item.shiny ? '✨ Shiny ' : '') + sp.name }));
-    node.appendChild(el('div', { class: 'reveal-rarity', text: r.name + ' • ⛁ ' + fmt(G.state.valueOf(item)) }));
-    if (G.fx) G.fx.celebrate(sp.tier);
-    return modal('', node);
+    function build() {
+      const node = el('div', { class: 'reveal r' + sp.tier });
+      node.style.setProperty('--rcolor', r.color);
+      node.appendChild(el('div', { class: 'reveal-head', text: headline || 'You got…' }));
+      const big = el('div', { class: 'reveal-sprite' });
+      big.appendChild(G.sprites.el(sp, 140));
+      node.appendChild(big);
+      node.appendChild(el('div', { class: 'reveal-name', text: (item.shiny ? '✨ Shiny ' : '') + sp.name }));
+      node.appendChild(el('div', { class: 'reveal-rarity', text: r.name + ' • ⛁ ' + fmt(G.state.valueOf(item)) }));
+      if (G.fx) G.fx.celebrate(sp.tier);
+      return modal('', node);
+    }
+    // rarer pulls get a suspenseful build-up first
+    if (G.fx && sp.tier >= 2) { G.fx.suspense(sp.tier, build); return null; }
+    return build();
   }
 
   G.ui = { $: $, $$: $$, el: el, fmt: fmt, toast: toast, card: card, modal: modal, reveal: reveal, haptic: haptic };

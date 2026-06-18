@@ -100,23 +100,29 @@
 
   // ---- shared result panel -------------------------------------------------
   function showResult(res, container, onAgain) {
-    container.innerHTML = '';
-    G.ui.haptic(res.lost ? 180 : [25, 40, 30, 40, 80]);
-    if (res.lost) {
-      container.appendChild(el('div', { class: 'gresult bad', html:
-        '💀 Lost! Your wager of ' + res.count + ' creature' + (res.count > 1 ? 's' : '') + ' (⛁ ' + fmt(res.stake) + ') is gone.' }));
-    } else {
-      const sp = G.state.getSpecies(res.item.sid);
-      const r = G.data.rarity(sp.tier);
-      if (G.fx) G.fx.celebrate(sp.tier);
-      container.appendChild(el('div', { class: 'gresult good', html:
-        '🎉 ×' + res.mult + ' → won a <b>' + r.name + '</b>!' }));
-      container.appendChild(G.ui.card(res.item, { size: 84 }));
-      container.appendChild(el('div', { class: 'gsub', html:
-        'Staked ⛁ ' + fmt(res.stake) + ' → payout ⛁ ' + fmt(res.target) }));
+    const tier = res.lost ? -1 : (G.state.getSpecies(res.item.sid) || {}).tier;
+    function build() {
+      container.innerHTML = '';
+      G.ui.haptic(res.lost ? 180 : [25, 40, 30, 40, 80]);
+      if (res.lost) {
+        container.appendChild(el('div', { class: 'gresult bad', html:
+          '💀 Lost! Your wager of ' + res.count + ' creature' + (res.count > 1 ? 's' : '') + ' (⛁ ' + fmt(res.stake) + ') is gone.' }));
+      } else {
+        const sp = G.state.getSpecies(res.item.sid);
+        const r = G.data.rarity(sp.tier);
+        if (G.fx) G.fx.celebrate(sp.tier);
+        container.appendChild(el('div', { class: 'gresult good', html:
+          '🎉 ×' + res.mult + ' → won a <b>' + r.name + '</b>!' }));
+        container.appendChild(G.ui.card(res.item, { size: 84 }));
+        container.appendChild(el('div', { class: 'gsub', html:
+          'Staked ⛁ ' + fmt(res.stake) + ' → payout ⛁ ' + fmt(res.target) }));
+      }
+      container.appendChild(el('button', { class: 'btn primary', text: 'Play again', onclick: onAgain }));
+      if (window.refreshAll) window.refreshAll();
     }
-    container.appendChild(el('button', { class: 'btn primary', text: 'Play again', onclick: onAgain }));
-    if (window.refreshAll) window.refreshAll();
+    // suspenseful build-up before revealing a rare+ win
+    if (!res.lost && G.fx && tier >= 2) { container.innerHTML = ''; G.fx.suspense(tier, build); }
+    else build();
   }
 
   function payoutTable(rows) {
