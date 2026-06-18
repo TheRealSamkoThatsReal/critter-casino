@@ -122,6 +122,7 @@
     const inst = G.state.addSpecies(sp.id, isShiny);
     s.stats.hatched++;
     G.state.save();
+    G.ui.haptic(isShiny ? [20, 40, 20, 40, 20, 40, 90] : [15, 30, 50]);
     G.ui.reveal(inst, isShiny ? '✨ A SHINY hatched! ✨' : 'It hatched!');
     refreshAll();
   }
@@ -209,10 +210,21 @@
     });
     window.addEventListener('appinstalled', function () { if (installBtn) installBtn.hidden = true; });
 
-    // service worker
+    // service worker + auto-update: when a new SW takes control, reload once so
+    // returning users always get the latest assets (no stale cache).
     if ('serviceWorker' in navigator) {
+      const hadController = !!navigator.serviceWorker.controller;
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (refreshing || !hadController) return;
+        refreshing = true;
+        window.location.reload();
+      });
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('./sw.js').catch(function () {});
+        navigator.serviceWorker.register('./sw.js').then(function (reg) {
+          // check for updates on each launch
+          reg.update().catch(function () {});
+        }).catch(function () {});
       });
     }
   }

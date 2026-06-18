@@ -29,6 +29,12 @@
     return String(n);
   }
 
+  // Haptic feedback (Android Chrome etc.; silently no-ops where unsupported,
+  // e.g. iOS Safari, which doesn't implement the Vibration API).
+  function haptic(pattern) {
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+  }
+
   function toast(msg, kind) {
     const wrap = $('#toasts');
     const t = el('div', { class: 'toast ' + (kind || ''), text: msg });
@@ -64,7 +70,7 @@
     if (opts.badge) c.appendChild(el('div', { class: 'cbadge', text: opts.badge }));
     if (opts.onClick) {
       c.classList.add('clickable');
-      c.addEventListener('click', function () { opts.onClick(item, c); });
+      c.addEventListener('click', function () { haptic(8); opts.onClick(item, c); });
     }
     return c;
   }
@@ -109,5 +115,5 @@
     return modal('', node);
   }
 
-  G.ui = { $: $, $$: $$, el: el, fmt: fmt, toast: toast, card: card, modal: modal, reveal: reveal };
+  G.ui = { $: $, $$: $$, el: el, fmt: fmt, toast: toast, card: card, modal: modal, reveal: reveal, haptic: haptic };
 })(window.G = window.G || {});

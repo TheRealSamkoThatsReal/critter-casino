@@ -101,6 +101,7 @@
   // ---- shared result panel -------------------------------------------------
   function showResult(res, container, onAgain) {
     container.innerHTML = '';
+    G.ui.haptic(res.lost ? 180 : [25, 40, 30, 40, 80]);
     if (res.lost) {
       container.appendChild(el('div', { class: 'gresult bad', html:
         '💀 Lost! Your wager of ' + res.count + ' creature' + (res.count > 1 ? 's' : '') + ' (⛁ ' + fmt(res.stake) + ') is gone.' }));
@@ -147,7 +148,7 @@
     action.appendChild(flipBtn);
     const m = G.ui.modal('Coin Flip', wrap);
     flipBtn.addEventListener('click', function () {
-      flipBtn.disabled = true;
+      G.ui.haptic(18); flipBtn.disabled = true;
       const win = Math.random() < 0.5;
       coin.classList.add('flipping');
       coin.style.setProperty('--end', win ? '0deg' : '180deg');
@@ -199,7 +200,7 @@
     const m = G.ui.modal('Lucky Wheel', wrap);
     let rot = 0;
     spinBtn.addEventListener('click', function () {
-      spinBtn.disabled = true;
+      G.ui.haptic(18); spinBtn.disabled = true;
       let r = Math.random() * total, idx = 0;
       for (let i = 0; i < WHEEL.length; i++) { r -= WHEEL[i].w; if (r <= 0) { idx = i; break; } }
       const targetDeg = 360 - segMid[idx] + (5 * 360);
@@ -232,7 +233,7 @@
     const m = G.ui.modal('Slots', wrap);
     const ALL = SYMS.concat([STAR]);
     btn.addEventListener('click', function () {
-      btn.disabled = true;
+      G.ui.haptic(18); btn.disabled = true;
       const roll = Math.random();
       let cat, mult, final;
       if (roll < 0.02) { cat = 'jackpot'; mult = 8; final = [STAR, STAR, STAR]; }
@@ -274,7 +275,7 @@
     const faces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
     const m = G.ui.modal('High Roll', wrap);
     btn.addEventListener('click', function () {
-      btn.disabled = true;
+      G.ui.haptic(18); btn.disabled = true;
       let spins = 0;
       const a = 1 + Math.floor(Math.random() * 6), b = 1 + Math.floor(Math.random() * 6);
       const iv = setInterval(function () {

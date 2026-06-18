@@ -1,5 +1,7 @@
-/* Service worker: offline app shell caching. */
-const CACHE = 'critter-casino-v1';
+/* Service worker: offline app shell with stale-while-revalidate so updates
+ * actually reach returning users (cache is refreshed in the background on
+ * every load, and a version bump wipes the old cache on activate). */
+const CACHE = 'critter-casino-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -33,17 +35,18 @@ self.addEventListener('activate', function (e) {
 });
 
 self.addEventListener('fetch', function (e) {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(function (cached) {
-      if (cached) return cached;
-      return fetch(e.request).then(function (resp) {
-        if (resp && resp.status === 200 && resp.type === 'basic') {
-          const copy = resp.clone();
-          caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
-        }
-        return resp;
-      }).catch(function () { return caches.match('./index.html'); });
-    })
-  );
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return; // don't touch cross-origin
+  e.respondWith((async function () {
+    const cache = await caches.open(CACHE);
+    const cached = await cache.match(req);
+    const network = fetch(req).then(function (resp) {
+      if (resp && resp.status === 200 && resp.type === 'basic') cache.put(req, resp.clone());
+      return resp;
+    }).catch(function () { return null; });
+    // serve cache immediately if present (and refresh in background), else network
+    return cached || (await network) || cache.match('./index.html');
+  })());
 });
