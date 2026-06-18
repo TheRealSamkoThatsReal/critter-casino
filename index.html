@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#12101f" />
+  <meta name="description" content="Collect pixel creatures, gamble them in casino games, and trade with friends." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="stylesheet" href="./css/style.css" />
+  <title>Critter Casino</title>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🃏 <span>Critter Casino</span></div>
+    <div class="topbar-right">
+      <div class="coinbox" title="Coins">⛁ <span id="coins">0</span></div>
+      <button id="install" class="install-btn" hidden>⬇ Install</button>
+    </div>
+  </header>
+
+  <main id="view" class="view"></main>
+
+  <nav class="navbar">
+    <button class="navbtn active" data-view="collection"><span class="ni">📦</span><span class="nl">Collection</span></button>
+    <button class="navbtn" data-view="hatch"><span class="ni">🥚</span><span class="nl">Hatch</span></button>
+    <button class="navbtn" data-view="casino"><span class="ni">🎲</span><span class="nl">Casino</span></button>
+    <button class="navbtn" data-view="trade"><span class="ni">🤝</span><span class="nl">Trade</span></button>
+    <button class="navbtn" data-view="admin"><span class="ni">🛠</span><span class="nl">Admin</span></button>
+  </nav>
+
+  <div id="toasts" class="toasts"></div>
+
+  <script src="./js/sprites.js"></script>
+  <script src="./js/data.js"></script>
+  <script src="./js/state.js"></script>
+  <script src="./js/ui.js"></script>
+  <script src="./js/games.js"></script>
+  <script src="./js/trade.js"></script>
+  <script src="./js/admin.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
