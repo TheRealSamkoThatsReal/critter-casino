@@ -1,13 +1,14 @@
 /* Service worker: offline app shell with stale-while-revalidate so updates
  * actually reach returning users (cache is refreshed in the background on
  * every load, and a version bump wipes the old cache on activate). */
-const CACHE = 'critter-casino-v8';
+const CACHE = 'critter-casino-v9';
 const ASSETS = [
   './',
   './index.html',
   './css/style.css',
   './manifest.webmanifest',
   './js/fx.js',
+  './js/push.js',
   './js/sprites.js',
   './js/data.js',
   './js/state.js',
@@ -33,6 +34,34 @@ self.addEventListener('activate', function (e) {
     caches.keys().then(function (keys) {
       return Promise.all(keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); }));
     }).then(function () { return self.clients.claim(); })
+  );
+});
+
+self.addEventListener('push', function (e) {
+  let data = {};
+  try { data = e.data ? e.data.json() : {}; } catch (err) { data = { body: e.data && e.data.text() }; }
+  const title = data.title || 'Critter Casino';
+  const opts = {
+    body: data.body || 'Come back and play!',
+    icon: './icons/icon-192.png',
+    badge: './icons/icon-192.png',
+    tag: 'critter-daily',
+    renotify: true,
+    data: { url: data.url || './' }
+  };
+  e.waitUntil(self.registration.showNotification(title, opts));
+});
+
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || './';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (cl) {
+      for (let i = 0; i < cl.length; i++) {
+        if ('focus' in cl[i]) { cl[i].focus(); return; }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })
   );
 });
 

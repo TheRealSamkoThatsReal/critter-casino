@@ -1,0 +1,24 @@
+name = "critter-casino-push"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+# Hourly cron: each subscriber is reminded at their own chosen local hour.
+[triggers]
+crons = ["0 * * * *"]
+
+# KV namespace that stores push subscriptions.
+# Create it once with:  npx wrangler kv namespace create SUBS
+# then paste the printed id below.
+[[kv_namespaces]]
+binding = "SUBS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[vars]
+# Public VAPID key (safe to commit). Must match VAPID_PUBLIC_KEY in js/push.js.
+VAPID_PUBLIC = "BIib9JSjizYPUcIlyTTCIKNXUT20TSgGEMG4VMMZqCIW_JvrdPYFw-rlKIK7ZAv1DrGnlLfnsTT8eUG-PI_dpRg"
+# Change this to a real contact (mailto: or https URL) per the VAPID spec.
+VAPID_SUBJECT = "mailto:you@example.com"
+
+# The private VAPID key is a SECRET — never put it here. Set it with:
+#   npx wrangler secret put VAPID_PRIVATE
+# (value is in server/SETUP.md)

@@ -236,6 +236,72 @@
   }
   window.refreshAll = refreshAll;
 
+  // ---- daily reminder (push) settings --------------------------------------
+  function hourLabel(h) {
+    const ap = h < 12 ? 'AM' : 'PM';
+    const hr = h % 12 === 0 ? 12 : h % 12;
+    return hr + ':00 ' + ap;
+  }
+  function openReminders(onChange) {
+    const wrap = el('div', {});
+    wrap.appendChild(el('p', { class: 'gdesc', text:
+      'Get a daily nudge so you never miss your streak, daily rewards, or ranch coins. We only send if you haven\'t played that day.' }));
+
+    if (!G.push.supported()) {
+      wrap.appendChild(el('div', { class: 'gresult bad', text: 'This browser doesn\'t support notifications.' }));
+      G.ui.modal('🔔 Daily Reminders', wrap); return;
+    }
+    if (G.push.isIOS() && !G.push.isStandalone()) {
+      wrap.appendChild(el('div', { class: 'help-card', html:
+        '<b>On iPhone/iPad:</b> add Critter Casino to your Home Screen first (Share → Add to Home Screen), then open it from there to enable reminders.' }));
+      G.ui.modal('🔔 Daily Reminders', wrap); return;
+    }
+    if (!G.push.configured()) {
+      wrap.appendChild(el('div', { class: 'help-card', html:
+        'Reminders aren\'t connected to a server yet. (Deploy the push Worker and set <code>PUSH_BASE</code> in <code>js/push.js</code>.)' }));
+      G.ui.modal('🔔 Daily Reminders', wrap); return;
+    }
+
+    const hourSel = el('select', { class: 'a-input' });
+    for (let h = 0; h < 24; h++) {
+      const o = el('option', { value: h, text: hourLabel(h) });
+      if (h === G.push.getHour()) o.selected = true;
+      hourSel.appendChild(o);
+    }
+    wrap.appendChild(el('div', { class: 'name-row' }, [el('label', { text: 'Remind me at: ' }), hourSel]));
+
+    const status = el('div', { class: 'gsub' });
+    const btn = el('button', { class: 'btn primary big' });
+    wrap.appendChild(el('div', { class: 'gaction' }, [btn, status]));
+    const m = G.ui.modal('🔔 Daily Reminders', wrap);
+
+    function refresh() {
+      G.push.isEnabled().then(function (on) {
+        btn.textContent = on ? '🔕 Turn off reminders' : '🔔 Turn on reminders';
+        status.textContent = on ? ('On — daily at ' + hourLabel(G.push.getHour())) :
+          (G.push.permission() === 'denied' ? 'Notifications are blocked in your browser settings.' : 'Off');
+      });
+    }
+    refresh();
+    hourSel.addEventListener('change', function () {
+      G.push.setHour(parseInt(hourSel.value, 10));
+      G.push.isEnabled().then(function (on) { if (on) G.push.enable().catch(function () {}); refresh(); });
+    });
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      G.push.isEnabled().then(function (on) {
+        const action = on ? G.push.disable() : G.push.enable(parseInt(hourSel.value, 10));
+        Promise.resolve(action).then(function () {
+          toast(on ? 'Reminders off.' : 'Reminders on! 🔔', 'good');
+        }).catch(function (e) {
+          toast(e && e.message === 'denied' ? 'Permission blocked in browser settings.' : 'Could not enable reminders.', 'bad');
+        }).then(function () {
+          btn.disabled = false; refresh(); if (onChange) onChange();
+        });
+      });
+    });
+  }
+
   // ---- bootstrap -----------------------------------------------------------
   function init() {
     G.ui.$$('.navbtn').forEach(function (b) {
@@ -254,6 +320,17 @@
       sync();
       muteBtn.addEventListener('click', function () { G.fx.toggleMute(); sync(); });
     }
+
+    // daily reminder (push) toggle
+    const bellBtn = document.getElementById('bell');
+    if (bellBtn) {
+      const syncBell = function () {
+        G.push.isEnabled().then(function (on) { bellBtn.textContent = on ? '🔔' : '🔕'; });
+      };
+      syncBell();
+      bellBtn.addEventListener('click', function () { openReminders(syncBell); });
+    }
+    if (G.push) G.push.heartbeat();
 
     // PWA install prompt
     let deferred = null;

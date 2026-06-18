@@ -19,6 +19,11 @@ with **no backend required**, hosted on GitHub Pages.
 - **Swipe navigation** — swipe left/right anywhere on a page to move between
   tabs (with a slide animation). Ignores vertical scrolls and is disabled while
   a dialog is open.
+- **Daily push reminders** (optional) — a 🔔 toggle subscribes you to a once-a-day
+  reminder at a time you choose, delivered via the Web Push protocol even when
+  the app is closed (and skipped on days you already played). This needs a tiny
+  serverless backend — a Cloudflare Worker in `server/` (free tier); see
+  `server/SETUP.md`. Everything else runs with no backend.
 - **Procedural pixel-art sprites** — every creature's sprite is generated
   deterministically from its id, so the roster can grow without art files.
   Includes ✨ shiny variants worth 5×.
