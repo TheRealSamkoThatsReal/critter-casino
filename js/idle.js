@@ -6,7 +6,8 @@
   const el = G.ui.el, fmt = G.ui.fmt, toast = G.ui.toast;
 
   // coins/sec produced by one creature of each tier (shiny = x5)
-  const RATE = [0.05, 0.2, 0.8, 3, 12, 45, 180];
+  const RATE = [0.05, 0.2, 0.8, 3, 12, 45, 180,
+    700, 2800, 11000, 44000, 175000, 700000];
 
   // income rates can be fractional; keep small values readable instead of "0"
   function fmtRate(n) {

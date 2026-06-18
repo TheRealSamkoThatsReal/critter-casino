@@ -1,12 +1,13 @@
 /* Service worker: offline app shell with stale-while-revalidate so updates
  * actually reach returning users (cache is refreshed in the background on
  * every load, and a version bump wipes the old cache on activate). */
-const CACHE = 'critter-casino-v5';
+const CACHE = 'critter-casino-v6';
 const ASSETS = [
   './',
   './index.html',
   './css/style.css',
   './manifest.webmanifest',
+  './js/fx.js',
   './js/sprites.js',
   './js/data.js',
   './js/state.js',

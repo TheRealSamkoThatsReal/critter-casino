@@ -108,6 +108,7 @@
     } else {
       const sp = G.state.getSpecies(res.item.sid);
       const r = G.data.rarity(sp.tier);
+      if (G.fx) G.fx.celebrate(sp.tier);
       container.appendChild(el('div', { class: 'gresult good', html:
         '🎉 ×' + res.mult + ' → won a <b>' + r.name + '</b>!' }));
       container.appendChild(G.ui.card(res.item, { size: 84 }));

@@ -153,10 +153,10 @@
   // Completion is based on the built-in roster only, so admin-added creatures
   // don't make the goal unreachable.
   function dexProgress() {
-    const total = G.data.builtinRoster.length;
+    const core = G.data.builtinRoster.filter(function (sp) { return sp.tier <= G.data.PRESTIGE_MAX_TIER; });
     let have = 0;
-    G.data.builtinRoster.forEach(function (sp) { if (state.discovered[sp.id]) have++; });
-    return { have: have, total: total };
+    core.forEach(function (sp) { if (state.discovered[sp.id]) have++; });
+    return { have: have, total: core.length };
   }
   function canPrestige() {
     const p = dexProgress();

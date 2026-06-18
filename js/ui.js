@@ -112,6 +112,7 @@
     node.appendChild(big);
     node.appendChild(el('div', { class: 'reveal-name', text: (item.shiny ? '✨ Shiny ' : '') + sp.name }));
     node.appendChild(el('div', { class: 'reveal-rarity', text: r.name + ' • ⛁ ' + fmt(G.state.valueOf(item)) }));
+    if (G.fx) G.fx.celebrate(sp.tier);
     return modal('', node);
   }
 

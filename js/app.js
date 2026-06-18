@@ -206,6 +206,15 @@
     renderHeader();
     navigate('collection');
     G.idle.init(); // start passive income + offline earnings
+    G.fx.init();   // arm audio on first gesture
+
+    // sound mute toggle
+    const muteBtn = document.getElementById('mute');
+    if (muteBtn) {
+      const sync = function () { muteBtn.textContent = G.fx.isMuted() ? '🔇' : '🔊'; };
+      sync();
+      muteBtn.addEventListener('click', function () { G.fx.toggleMute(); sync(); });
+    }
 
     // PWA install prompt
     let deferred = null;

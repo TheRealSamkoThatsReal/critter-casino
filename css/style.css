@@ -50,6 +50,10 @@ body {
   background: var(--accent2); color: #fff; border: 0; border-radius: 999px;
   padding: 6px 11px; font-weight: 700; font-size: 13px;
 }
+.mute-btn {
+  background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 999px;
+  padding: 5px 9px; font-size: 15px; line-height: 1; cursor: pointer;
+}
 
 /* ---- main view ---- */
 .view {
@@ -140,7 +144,15 @@ body {
 .card.r4 { box-shadow: 0 0 18px -1px var(--glow); }
 .card.r5 { box-shadow: 0 0 22px 0 var(--glow); }
 .card.r6 { box-shadow: 0 0 26px 1px var(--glow); animation: divinepulse 2.2s ease-in-out infinite; }
-@keyframes divinepulse { 0%,100% { box-shadow: 0 0 18px 0 var(--glow); } 50% { box-shadow: 0 0 30px 4px var(--glow); } }
+.card.r7, .card.r8, .card.r9, .card.r10, .card.r11, .card.r12 {
+  box-shadow: 0 0 26px 1px var(--glow); animation: divinepulse 1.8s ease-in-out infinite;
+}
+.card.r10, .card.r11, .card.r12 { animation: divinepulse 1.2s ease-in-out infinite; }
+.card.r12 { animation: divinepulse 1.2s ease-in-out infinite, omega-spin 6s linear infinite; }
+@keyframes divinepulse { 0%,100% { box-shadow: 0 0 18px 0 var(--glow); } 50% { box-shadow: 0 0 32px 5px var(--glow); } }
+@keyframes omega-spin { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+.pill.r7 { color: #5ad6ff; } .pill.r8 { color: #a06bff; } .pill.r9 { color: #4dffb0; }
+.pill.r10 { color: #ff6ad5; } .pill.r11 { color: #ffcf3d; } .pill.r12 { color: #ff2d95; }
 
 /* ---- collection stats ---- */
 .coll-stats { display: flex; gap: 8px; margin-bottom: 12px; }

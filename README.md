@@ -7,8 +7,13 @@ with **no backend required**, hosted on GitHub Pages.
 
 ## Features
 
-- **74+ collectible creatures** across 7 rarities: Common → Uncommon → Rare →
-  Epic → Legendary → Mythic → Divine. Each has a value based on rarity.
+- **100+ collectible creatures** across 13 rarities: Common → Uncommon → Rare →
+  Epic → Legendary → Mythic → Divine → Celestial → Astral → Ethereal →
+  Primordial → Eternal → Omega. The tiers above Divine are ultra-rare chase
+  items (Omega is worth millions). Each creature's value scales with rarity.
+- **SFX + VFX** — pulling a Rare or better fires a synthesized Web Audio chime
+  (grander the rarer it is, no audio files needed) and a confetti + shockwave
+  burst. A mute toggle lives in the top bar.
 - **Procedural pixel-art sprites** — every creature's sprite is generated
   deterministically from its id, so the roster can grow without art files.
   Includes ✨ shiny variants worth 5×.
