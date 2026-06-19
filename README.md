@@ -29,14 +29,18 @@ with **no backend required**, hosted on GitHub Pages.
   Includes ✨ shiny variants worth 5×.
 - **Hatch eggs** to grow your collection; sell duplicates for coins to buy
   better eggs. Paid eggs support **bulk hatching (×10 / ×100)** with a grouped
-  results summary, to spend coins fast. A free **Daily Egg** gives a creature
+  results summary, to spend coins fast — but each egg's price **rises the more
+  of it you buy** in a run (resets on prestige), so flooding eggs gets costly.
+  A free **Daily Egg** gives a creature
   from any unlocked rarity, favouring species you haven't collected yet —
   *weighted by rarity*, so it fills the easy slots quickly but the rare tail of
   the Critterdex stays a genuine grind.
 - **Fusion** — combine **3 creatures of one rarity into 1 of the next rarity up**
   (from the Collection's 🔥 Fuse button). Rarity values are ~3× per tier, so it's
   roughly value-neutral — a way to shrink a bloated collection and climb tiers at
-  once. Bulk-fuse many at a time.
+  once. Bulk-fuse many at a time, or **⚡ Max Fuse** to cascade your whole
+  collection upward in one tap (3→1, rolling new creatures up until nothing else
+  can fuse).
 - **"NEW" badges** — the first time you obtain a species you've never discovered,
   it's flagged **NEW** right on the reveal: a ✦ NEW DISCOVERY ribbon on the
   single-egg popup and a green NEW corner badge on the multi-hatch/fusion summary

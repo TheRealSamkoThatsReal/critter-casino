@@ -233,13 +233,14 @@
 
   function hatch(egg) {
     const s = G.state.get();
-    if (egg.cost > 0 && s.coins < eggCost(egg)) { toast('Not enough coins.', 'bad'); return; }
+    const cost = eggCost(egg);
+    if (egg.cost > 0 && s.coins < cost) { toast('Not enough coins.', 'bad'); return; }
     if (egg.cd) {
       const next = (s.cooldowns[egg.id] || 0);
       if (Date.now() < next) { toast('Free egg not ready yet.', 'bad'); return; }
       s.cooldowns[egg.id] = Date.now() + egg.cd;
     }
-    if (egg.cost > 0) G.state.addCoins(-eggCost(egg));
+    if (egg.cost > 0) { G.state.addCoins(-cost); noteEggBuys(egg, 1); }
     const sp = egg.special === 'dex' ? G.state.dailyPick() : G.state.randomSpecies(egg.min, egg.max);
     if (!sp) { toast('No creatures available.', 'bad'); return; }
     const isShiny = G.state.rollShiny(egg.shiny);
@@ -251,15 +252,32 @@
     refreshAll();
   }
 
-  // egg prices rise each prestige (1.6^prestige)
-  function eggCost(egg) { return Math.round((egg.cost || 0) * G.state.progressScale()); }
+  // egg prices rise each prestige (progressScale) AND with how many of that egg
+  // you've already bought this run (+EGG_SCALE of base per purchase), so flooding
+  // eggs gets steadily pricier. Resets each prestige.
+  const EGG_SCALE = 0.05;
+  function eggBuyCount(egg) { return (G.state.get().eggBuys || {})[egg.id] || 0; }
+  function eggCostAt(egg, n) { return Math.round((egg.cost || 0) * G.state.progressScale() * (1 + EGG_SCALE * n)); }
+  function eggCost(egg) { return eggCostAt(egg, eggBuyCount(egg)); } // price of the next one
+  function eggBulkCost(egg, count) {
+    let total = 0, c = eggBuyCount(egg);
+    for (let i = 0; i < count; i++) total += eggCostAt(egg, c + i);
+    return total;
+  }
+  function noteEggBuys(egg, n) {
+    if (!(egg.cost > 0)) return;
+    const s = G.state.get();
+    if (!s.eggBuys) s.eggBuys = {};
+    s.eggBuys[egg.id] = (s.eggBuys[egg.id] || 0) + n;
+  }
 
   // open N paid eggs at once and show a grouped summary (no per-egg suspense)
   function multiHatch(egg, n) {
     const s = G.state.get();
-    const total = eggCost(egg) * n;
+    const total = eggBulkCost(egg, n);
     if (s.coins < total) { toast('Not enough coins.', 'bad'); return; }
     G.state.addCoins(-total);
+    noteEggBuys(egg, n);
     const results = [];
     for (let i = 0; i < n; i++) {
       const sp = G.state.randomSpecies(egg.min, egg.max);
@@ -275,6 +293,41 @@
   // cost to guarantee a shiny fusion result = result-tier base value x this.
   // Shiny gives 5x value AND 5x income forever, so this is a steep premium.
   const SHINY_FUSE_MULT = 40;
+
+  // Max Fuse: how many fusions a full cascade would do (counts only, no mutation).
+  // Each tier's groups of 3 roll up into the next tier, which may then fuse too.
+  function maxFusePreview() {
+    const cap = G.state.maxTierUnlocked(), counts = {};
+    G.state.get().inv.forEach(function (it) { const sp = G.state.getSpecies(it.sid); if (sp) counts[sp.tier] = (counts[sp.tier] || 0) + 1; });
+    let fuses = 0;
+    for (let t = 0; t < cap; t++) {
+      const groups = Math.floor((counts[t] || 0) / 3);
+      fuses += groups;
+      counts[t + 1] = (counts[t + 1] || 0) + groups;
+    }
+    return fuses;
+  }
+  // Actually perform the cascade: fuse every tier as much as possible, lowest
+  // first, so newly-created creatures roll up and fuse again.
+  function runMaxFuse() {
+    const cap = G.state.maxTierUnlocked(), created = [];
+    for (let tier = 0; tier < cap; tier++) {
+      while (true) {
+        const list = G.state.get().inv.filter(function (it) { const sp = G.state.getSpecies(it.sid); return sp && sp.tier === tier; });
+        if (list.length < 3) break;
+        list.sort(function (a, b) { return (a.shiny ? 1 : 0) - (b.shiny ? 1 : 0); }); // spend non-shiny first
+        const trio = list.slice(0, 3);
+        const allShiny = trio.every(function (it) { return it.shiny; });
+        trio.forEach(function (it) { G.state.removeInstance(it.iid); });
+        const sp = G.state.randomSpeciesAtTier(tier + 1);
+        if (sp) created.push(G.state.addSpecies(sp.id, allShiny || G.state.rollShiny(0.03)));
+      }
+    }
+    G.state.save();
+    if (window.refreshAll) window.refreshAll();
+    // only the creatures still in the inventory are final products (intermediates were consumed)
+    return created.filter(function (it) { return G.state.getInstance(it.iid); });
+  }
 
   // ---- fusion: 3 of a rarity -> 1 of the next (shrinks the collection) -----
   function fuseRarityOptions() {
@@ -304,7 +357,24 @@
     shinyChk.addEventListener('change', function () { forceShiny = shinyChk.checked; update(); });
     wrap.appendChild(info); wrap.appendChild(shinyRow); wrap.appendChild(tools); wrap.appendChild(grid);
     const goBtn = el('button', { class: 'btn primary' });
-    const m = G.ui.modal('🔥 Fuse', wrap, { footer: goBtn });
+    const maxBtn = el('button', { class: 'btn', text: '⚡ Max Fuse (all rarities)' });
+    const m = G.ui.modal('🔥 Fuse', wrap, { footer: el('div', { class: 'fuse-foot' }, [goBtn, maxBtn]) });
+    maxBtn.addEventListener('click', function () {
+      const fuses = maxFusePreview();
+      if (fuses < 1) { toast('Nothing left to fuse.', ''); return; }
+      const cnode = el('div', {});
+      cnode.appendChild(el('p', { class: 'gdesc', text:
+        'Fuse as many times as possible across ALL rarities? This performs ' + fuses + ' fusion' + (fuses !== 1 ? 's' : '') + ', consuming creatures up the chain (3 → 1 next rarity, cascading).' }));
+      const cm = G.ui.modal('⚡ Max Fuse', cnode);
+      cnode.appendChild(el('div', { class: 'gaction' }, [
+        el('button', { class: 'btn primary', text: '⚡ Fuse all', onclick: function () {
+          cm.close(); m.close(); G.ui.haptic([20, 30, 60]);
+          const fin = runMaxFuse();
+          if (fin.length) hatchSummary(fin, '⚡ Max fused into ' + fin.length + '!');
+        } }),
+        el('button', { class: 'btn', text: 'Cancel', onclick: function () { cm.close(); } })
+      ]));
+    });
     let tier = opts[0], selected = {}, cardByIid = {};
 
     function shinyCost() { return G.data.rarity(tier + 1).value * SHINY_FUSE_MULT; }
@@ -477,7 +547,7 @@
       if (egg.cost > 0) {
         const mult = el('div', { class: 'egg-mult' });
         [10, 100].forEach(function (n) {
-          const c = eggCost(egg) * n;
+          const c = eggBulkCost(egg, n);
           const b = el('button', { class: 'btn small', text: '×' + n + ' ⛁' + fmt(c) });
           b.disabled = G.state.get().coins < c;
           b.addEventListener('click', function () { multiHatch(egg, n); renderHatch(container); });

@@ -24,6 +24,7 @@
     peakCoins: 0,           // highest balance ever held (records)
     modsGained: 0,          // lifetime income modifiers grown (records)
     bmBuys: 0,              // black-market purchases this run (price escalation)
+    eggBuys: {},            // paid-egg purchases per egg id this run (price escalation)
     claimedMilestones: {},  // milestone amount -> 1
     stats: { hatched: 0, gambled: 0, wins: 0, losses: 0, traded: 0 },
     adminPass: 'admin',
@@ -315,6 +316,7 @@
     state.coins = Math.max(250, kept);
     state.runCoinsEarned = 0;
     state.bmBuys = 0;
+    state.eggBuys = {};
     state.upgrades = {};
     state.cooldowns = {};
     state.discovered = {};
