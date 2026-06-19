@@ -11,15 +11,51 @@
 (function (G) {
   'use strict';
   const el = G.ui.el, toast = G.ui.toast;
-  const PREFIX = 'CC1:';
+  const PREFIX = 'CC2:';      // compact codes
+  const OLD_PREFIX = 'CC1:';  // legacy base64-JSON (still decodable)
+  const ROSTER = G.data.builtinRoster;
+  let SIDX = null;
+  function sidIndex(sid) {
+    if (!SIDX) { SIDX = {}; ROSTER.forEach(function (s, i) { SIDX[s.id] = i; }); }
+    return SIDX[sid] != null ? SIDX[sid] : -1;
+  }
+  function isBuiltin(item) { return sidIndex(item.sid) >= 0; }
+  function shortId() { return Date.now().toString(36).slice(-5) + Math.floor(Math.random() * 1296).toString(36); }
+  function pendingOffers() { const s = G.state.get(); if (!s.pendingOffers) s.pendingOffers = {}; return s.pendingOffers; }
 
+  function b64u(s) { return s ? btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') : ''; }
+  function unb64u(s) {
+    if (!s) return '';
+    s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '=';
+    try { return decodeURIComponent(escape(atob(s))); } catch (e) { return ''; }
+  }
+  // each builtin creature -> one integer: rosterIndex*2 + shinyBit, joined by '-'
+  function packGive(give) {
+    return (give || []).map(function (it) { return sidIndex(it.sid) * 2 + (it.shiny ? 1 : 0); }).join('-');
+  }
+  function unpackGive(str) {
+    if (!str) return [];
+    return str.split('-').map(function (tok) {
+      const n = parseInt(tok, 10); const sp = ROSTER[n >> 1];
+      return { sid: sp ? sp.id : '?', shiny: (n & 1) === 1 };
+    });
+  }
+
+  // canonical obj: { t:'offer'|'accept', id, from:{name}, give:[{sid,shiny}] }
   function encode(obj) {
-    return PREFIX + btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+    const t = obj.t === 'accept' ? 'a' : 'o';
+    const parts = [t, obj.id, packGive(obj.give)];
+    if (t === 'o') parts.push(b64u((obj.from && obj.from.name) || ''));
+    return PREFIX + parts.join('.');
   }
   function decode(str) {
     str = (str || '').trim();
-    if (str.indexOf(PREFIX) === 0) str = str.slice(PREFIX.length);
-    return JSON.parse(decodeURIComponent(escape(atob(str))));
+    if (str.indexOf(OLD_PREFIX) === 0) { // legacy CC1 base64-JSON
+      return JSON.parse(decodeURIComponent(escape(atob(str.slice(OLD_PREFIX.length)))));
+    }
+    if (str.indexOf(PREFIX) !== 0) throw new Error('bad code');
+    const p = str.slice(PREFIX.length).split('.');
+    return { t: p[0] === 'a' ? 'accept' : 'offer', id: p[1], give: unpackGive(p[2]), from: { name: unb64u(p[3] || '') } };
   }
   function redeemed() {
     const s = G.state.get();
@@ -70,18 +106,19 @@
       footer: el('button', { class: 'btn primary', text: 'Create offer code', onclick: make })
     });
     function make() {
-      const items = Object.keys(selected).map(function (k) { return selected[k]; });
+      let items = Object.keys(selected).map(function (k) { return selected[k]; });
       if (!items.length) { toast('Select at least one creature.', 'bad'); return; }
+      const tradeable = items.filter(isBuiltin);
+      if (tradeable.length < items.length) toast('Custom creatures can\'t be traded — skipped.', '');
+      if (!tradeable.length) { toast('None of those can be traded.', 'bad'); return; }
+      items = tradeable;
       // escrow: remove from inventory
       items.forEach(function (it) { G.state.removeInstance(it.iid); });
       const me = G.state.get().player;
-      const offer = {
-        t: 'offer',
-        id: me.id + '-' + Date.now().toString(36),
-        from: { id: me.id, name: me.name },
-        give: items.map(strip)
-      };
+      const offer = { t: 'offer', id: shortId(), from: { id: me.id, name: me.name }, give: items.map(strip) };
+      pendingOffers()[offer.id] = 1; // remember our own offer (for reclaim detection)
       const code = encode(offer);
+      G.state.save();
       m.setFooter(null);
       m.body.innerHTML = '';
       m.body.appendChild(el('div', { class: 'gresult good', text: 'Offer created & escrowed!' }));
@@ -109,8 +146,8 @@
       if (!obj || !obj.t) { toast('Unrecognized code.', 'bad'); return; }
       const me = G.state.get().player;
       if (obj.t === 'offer') {
-        if (obj.from && obj.from.id === me.id) return reclaimFlow(obj, m);
-        return respondFlow(obj, m);
+        const mine = (obj.from && obj.from.id === me.id) || pendingOffers()[obj.id];
+        return mine ? reclaimFlow(obj, m) : respondFlow(obj, m);
       }
       if (obj.t === 'accept') return completeFlow(obj, m);
       toast('Unrecognized code type.', 'bad');
@@ -152,8 +189,11 @@
       m.setFooter(null);
       // receive offered creatures
       offer.give.forEach(function (it) { G.state.addInstance(G.state.mkInstance(it.sid, it.shiny)); });
-      // escrow my give-back
-      const mine = Object.keys(selected).map(function (k) { return selected[k]; });
+      // escrow my give-back (built-in creatures only; customs aren't shareable)
+      let mine = Object.keys(selected).map(function (k) { return selected[k]; });
+      const tradeable = mine.filter(isBuiltin);
+      if (tradeable.length < mine.length) toast('Custom creatures can\'t be traded — skipped.', '');
+      mine = tradeable;
       mine.forEach(function (it) { G.state.removeInstance(it.iid); });
       redeemed()[codeId(offer)] = 1;
       G.state.get().stats.traded++;
