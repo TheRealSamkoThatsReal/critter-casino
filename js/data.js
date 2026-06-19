@@ -161,7 +161,7 @@
     { id: 'casino',   icon: '🍀', name: 'High Roller',         per: 0.08, base: 5,  growth: 1.7,  max: 12,       fmt: 'casino', desc: 'casino payout' },
     { id: 'modrate',  icon: '🧬', name: 'Modifier Affinity',   per: 0.40, base: 8,  growth: 2.0,  max: 6,        fmt: 'rate',   desc: 'chance creatures grow a modifier' },
     { id: 'shiny',    icon: '🌟', name: 'Lucky Hatch',         per: 0.01, base: 6,  growth: 1.8,  max: 10,       fmt: 'shiny',  desc: 'shiny chance when hatching/fusing' },
-    { id: 'nest',     icon: '💰', name: 'Nest Egg',            per: 0.005, base: 6, growth: 2.0,  max: 10,       fmt: 'keep',   desc: 'of your coins kept through prestige' },
+    { id: 'nest',     icon: '💰', name: 'Nest Egg',            per: 0.001, base: 6, growth: 2.0,  max: 10,       fmt: 'keep',   desc: 'of your coins kept through prestige (capped)' },
     { id: 'compound', icon: '🌠', name: 'Stardust Compounder', per: 0.15, base: 10, growth: 1.9,  max: 12,       fmt: 'sd',     desc: 'Stardust earned on prestige' }
   ];
 

@@ -286,6 +286,13 @@
     const p = dexProgress();
     return p.have >= p.total;
   }
+  // Nest Egg carryover never exceeds this flat ceiling, so it can't scale into
+  // the billions no matter how rich you are.
+  const NEST_KEEP_CAP = 50000000; // 50M
+  // Prestiging costs coins (a few billion, scaling up each prestige) — a big
+  // late-game sink on top of completing the Critterdex.
+  function prestigeCost() { return Math.round(3e9 * Math.pow(2, state.prestige || 0)); }
+  function canAffordPrestige() { return (state.coins || 0) >= prestigeCost(); }
   function prestigeLevel() { return state.prestige || 0; }
   function prestigeMult() { return 1 + 0.5 * (state.prestige || 0); } // +50% income per prestige
   // egg prices & casino value-to-tier scale up each prestige (outpaces income,
@@ -294,10 +301,14 @@
 
   function doPrestige() {
     if (!canPrestige()) return false;
-    // award Stardust for the run before wiping it, and honour the Nest Egg keep
+    const cost = prestigeCost();
+    if ((state.coins || 0) < cost) return false; // can't afford the prestige fee
+    // award Stardust for the run before wiping it, pay the fee, then keep a
+    // capped slice of the remainder via Nest Egg
     const reward = stardustReward();
     state.stardust = (state.stardust || 0) + reward;
-    const kept = Math.floor((state.coins || 0) * nestKeepFrac());
+    state.coins -= cost;
+    const kept = Math.min(Math.floor((state.coins || 0) * nestKeepFrac()), NEST_KEEP_CAP);
     state.prestige = (state.prestige || 0) + 1;
     // hard reset of the run, keeping identity, custom species, lifetime stats
     state.inv = [];
@@ -344,6 +355,8 @@
     shinyBonus: shinyBonus,
     rollShiny: rollShiny,
     nestKeepFrac: nestKeepFrac,
+    prestigeCost: prestigeCost,
+    canAffordPrestige: canAffordPrestige,
     compounderMult: compounderMult,
     sdLevel: sdLevel, sdLinear: sdLinear, sdCost: sdCost, sdDef: sdDef,
     buyStardust: buyStardust,

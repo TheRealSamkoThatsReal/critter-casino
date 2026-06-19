@@ -462,25 +462,31 @@
     const unlock = nextUnlockName();
     const node = el('div', {});
     const proj = G.state.stardustReward();
-    const keepPct = Math.round(G.state.nestKeepFrac() * 100);
+    const keepPct = Math.round(G.state.nestKeepFrac() * 1000) / 10;
+    const cost = G.state.prestigeCost();
+    const afford = G.state.get().coins >= cost;
     node.appendChild(el('p', { class: 'gdesc', html:
-      'Prestiging <b>resets</b> your creatures, ' + (keepPct ? 'most ' : '') + 'coins, and Ranch upgrades — and clears your Critterdex.<br><br>' +
+      'Prestiging <b>costs ⛁ ' + fmt(cost) + '</b> and <b>resets</b> your creatures, coins, and Ranch upgrades — and clears your Critterdex.<br><br>' +
       'In return you gain a <b>permanent +50% income</b> (total +' + bonus + '% after this)' +
       (unlock ? ' and <b>unlock the ' + unlock + ' rarity</b>' : '') +
       (proj > 0 ? ' and <b>⭐ ' + fmt(proj) + ' Stardust</b>' : '') +
-      (keepPct ? ' (Nest Egg keeps ' + keepPct + '% of your coins)' : '') +
+      (keepPct ? ' (Nest Egg keeps ' + keepPct + '%, up to ⛁ 50M)' : '') +
       ', then collect them all again to prestige higher.' }));
+    if (!afford) node.appendChild(el('div', { class: 'gresult bad', text: 'Need ⛁ ' + fmt(cost) + ' to prestige — you have ⛁ ' + fmt(G.state.get().coins) + '.' }));
     const m = G.ui.modal('Prestige?', node);
+    const goBtn = el('button', { class: 'btn primary', text: afford ? '✨ Prestige — ⛁ ' + fmt(cost) : 'Need ⛁ ' + fmt(cost) });
+    goBtn.disabled = !afford;
+    goBtn.addEventListener('click', function () {
+      if (G.state.doPrestige()) {
+        G.ui.haptic([30, 50, 30, 50, 30, 50, 120]);
+        m.close();
+        toast('Prestige ' + G.state.prestigeLevel() + '! +' + bonus + '% permanent income.', 'good');
+        render(document.getElementById('view'));
+        if (window.refreshAll) window.refreshAll();
+      }
+    });
     node.appendChild(el('div', { class: 'gaction' }, [
-      el('button', { class: 'btn primary', text: '✨ Prestige', onclick: function () {
-        if (G.state.doPrestige()) {
-          G.ui.haptic([30, 50, 30, 50, 30, 50, 120]);
-          m.close();
-          toast('Prestige ' + G.state.prestigeLevel() + '! +' + bonus + '% permanent income.', 'good');
-          render(document.getElementById('view'));
-          if (window.refreshAll) window.refreshAll();
-        }
-      } }),
+      goBtn,
       el('button', { class: 'btn', text: 'Cancel', onclick: function () { m.close(); } })
     ]));
   }
@@ -529,6 +535,7 @@
     card.appendChild(el('div', { class: 'prestige-prog', text: 'Critterdex: ' + p.have + ' / ' + p.total + ' (' + pct + '%)' }));
     const proj = G.state.stardustReward();
     if (proj > 0) card.appendChild(el('div', { class: 'prestige-sd', html: '⭐ Earns <b>' + fmt(proj) + '</b> Stardust on prestige' }));
+    if (ready) card.appendChild(el('div', { class: 'prestige-prog', text: 'Prestige cost: ⛁ ' + fmt(G.state.prestigeCost()) }));
     const btn = el('button', { class: 'btn primary',
       text: ready ? (nxt ? '✨ Prestige → unlock ' + nxt : '✨ Prestige now') : '🔍 See what\'s left' });
     btn.addEventListener('click', function () { if (G.state.canPrestige()) confirmPrestige(); else showMissing(); });
