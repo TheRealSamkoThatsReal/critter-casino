@@ -32,6 +32,7 @@
     const target = Math.round(stake * mult);
     let tier = tierForValue(target);
     if (Math.random() < 0.07) tier = Math.min(MAXT, tier + 1); // lucky crit
+    tier = Math.min(tier, G.state.maxTierUnlocked()); // rarities above are prestige-locked
     const sp = G.state.randomSpeciesAtTier(tier) || G.state.randomSpeciesAtTier(0);
     const inst = G.state.addSpecies(sp.id, shiny());
     G.state.get().stats.wins++;

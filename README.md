@@ -34,10 +34,12 @@ with **no backend required**, hosted on GitHub Pages.
   Spend coins on upgrades (Habitat, Gilded Cages, Cozy Beds) to earn faster.
   This gives a reason to *hold* creatures rather than sell or wager them all.
 - **Prestige** — a persistent **Critterdex** tracks every species you've ever
-  owned. Discover all of the base creatures and you can prestige: your run
+  owned. Discover all currently-unlocked creatures and you can prestige: your run
   (creatures, coins, Ranch upgrades, dex) resets in exchange for a **permanent
-  +50% income** bonus that stacks every prestige. Collect them all again to
-  prestige higher.
+  +50% income** bonus that stacks every prestige **and unlocks the next rarity
+  tier** (Prestige 1 → Celestial … Prestige 6 → Omega). Rarities above your
+  prestige level are locked out of hatching and the casino, and the completion
+  bar grows to include each newly unlocked tier.
 - **Casino games** where you wager **one or many** creatures at once. Their
   combined value is your stake, and each game rolls a payout multiplier — the
   bigger your stake, the rarer the creature you can win. Lose, and the whole

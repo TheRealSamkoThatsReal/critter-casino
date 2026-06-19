@@ -97,6 +97,7 @@
   function randomSpecies(minTier, maxTier) {
     minTier = minTier == null ? 0 : minTier;
     maxTier = maxTier == null ? G.data.RARITIES.length - 1 : maxTier;
+    maxTier = Math.min(maxTier, maxTierUnlocked()); // rarities above this are prestige-locked
     const pool = [];
     let total = 0;
     allSpecies().forEach(function (s) {
@@ -157,11 +158,17 @@
   // ---- prestige (collect every base creature -> reset for a permanent bonus)
   // Completion is based on the built-in roster only, so admin-added creatures
   // don't make the goal unreachable.
+  // highest rarity tier currently available. Each prestige unlocks one more
+  // tier above Divine (prestige 1 -> Celestial ... prestige 6 -> Omega).
+  function maxTierUnlocked() {
+    return Math.min(G.data.RARITIES.length - 1, G.data.PRESTIGE_MAX_TIER + (state.prestige || 0));
+  }
   function dexProgress() {
-    const core = G.data.builtinRoster.filter(function (sp) { return sp.tier <= G.data.PRESTIGE_MAX_TIER; });
+    const cap = maxTierUnlocked();
+    const req = G.data.builtinRoster.filter(function (sp) { return sp.tier <= cap; });
     let have = 0;
-    core.forEach(function (sp) { if (state.discovered[sp.id]) have++; });
-    return { have: have, total: core.length };
+    req.forEach(function (sp) { if (state.discovered[sp.id]) have++; });
+    return { have: have, total: req.length };
   }
   function canPrestige() {
     const p = dexProgress();
@@ -208,6 +215,7 @@
     canPrestige: canPrestige,
     prestigeLevel: prestigeLevel,
     prestigeMult: prestigeMult,
+    maxTierUnlocked: maxTierUnlocked,
     doPrestige: doPrestige
   };
 })(window.G = window.G || {});

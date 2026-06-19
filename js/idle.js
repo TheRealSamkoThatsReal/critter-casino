@@ -240,14 +240,21 @@
   }
 
   // ---- prestige ------------------------------------------------------------
+  function nextUnlockName() {
+    const t = G.state.maxTierUnlocked() + 1;
+    return t < G.data.RARITIES.length ? G.data.rarity(t).name : null;
+  }
   function confirmPrestige() {
     if (!G.state.canPrestige()) return;
     const next = G.state.prestigeLevel() + 1;
     const bonus = Math.round((0.5 * next) * 100);
+    const unlock = nextUnlockName();
     const node = el('div', {});
     node.appendChild(el('p', { class: 'gdesc', html:
       'Prestiging <b>resets</b> your creatures, coins, and Ranch upgrades — and clears your Critterdex.<br><br>' +
-      'In return you gain a <b>permanent +50% income</b> (total +' + bonus + '% after this), then collect them all again to prestige higher.' }));
+      'In return you gain a <b>permanent +50% income</b> (total +' + bonus + '% after this)' +
+      (unlock ? ' and <b>unlock the ' + unlock + ' rarity</b>' : '') +
+      ', then collect them all again to prestige higher.' }));
     const m = G.ui.modal('Prestige?', node);
     node.appendChild(el('div', { class: 'gaction' }, [
       el('button', { class: 'btn primary', text: '✨ Prestige', onclick: function () {
@@ -273,13 +280,18 @@
       el('div', { class: 'prestige-title', html: '✨ Prestige' + (level ? ' <span class="prestige-lvl">Lv ' + level + '</span>' : '') }),
       el('div', { class: 'prestige-bonus', text: level ? ('+' + Math.round((G.state.prestigeMult() - 1) * 100) + '% income') : 'no bonus yet' })
     ]));
+    const top = G.data.rarity(G.state.maxTierUnlocked()).name;
+    const nxt = nextUnlockName();
     card.appendChild(el('div', { class: 'prestige-sub', text:
-      'Discover every base creature, then prestige to reset your run for +50% permanent income.' }));
+      'Top rarity unlocked: ' + top + '. ' +
+      (nxt ? 'Collect them all, then prestige to unlock ' + nxt + ' + permanent income.'
+           : 'Max rarity reached — prestige for more permanent income.') }));
     const fill = el('div', { class: 'pbar-fill' });
     fill.style.width = pct + '%';
     card.appendChild(el('div', { class: 'pbar' }, [fill]));
     card.appendChild(el('div', { class: 'prestige-prog', text: 'Critterdex: ' + p.have + ' / ' + p.total + ' (' + pct + '%)' }));
-    const btn = el('button', { class: 'btn primary', text: ready ? '✨ Prestige now' : '🔒 Collect them all to unlock' });
+    const btn = el('button', { class: 'btn primary',
+      text: ready ? (nxt ? '✨ Prestige → unlock ' + nxt : '✨ Prestige now') : '🔒 Collect them all to unlock' });
     btn.disabled = !ready;
     btn.addEventListener('click', confirmPrestige);
     card.appendChild(el('div', { class: 'gaction' }, [btn]));

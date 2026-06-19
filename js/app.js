@@ -110,8 +110,8 @@
       desc: 'Common to Epic.' },
     { id: 'rare', name: 'Glowing Egg', icon: '🪺', cost: 700, min: 1, max: 4, shiny: 0.05,
       desc: 'Uncommon to Legendary.' },
-    { id: 'cosmic', name: 'Cosmic Egg', icon: '🌌', cost: 5000, min: 2, max: 6, shiny: 0.10,
-      desc: 'Rare to Divine — best odds!' }
+    { id: 'cosmic', name: 'Cosmic Egg', icon: '🌌', cost: 5000, min: 2, max: 12, shiny: 0.10,
+      desc: 'Rare up to your top unlocked tier!' }
   ];
 
   function hatch(egg) {
