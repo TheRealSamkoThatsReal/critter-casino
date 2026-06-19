@@ -2,9 +2,10 @@ name = "critter-casino-push"
 main = "src/index.js"
 compatibility_date = "2025-06-01"
 
-# Hourly cron: each subscriber is reminded at their own chosen local hour.
+# Runs every minute so the "hungry" alert fires as soon as creatures hit 24h.
+# (Daily/starving reminders are throttled in code so this isn't spammy.)
 [triggers]
-crons = ["0 * * * *"]
+crons = ["* * * * *"]
 
 # KV namespace that stores push subscriptions.
 # Create it once with:  npx wrangler kv namespace create SUBS

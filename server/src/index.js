@@ -100,25 +100,32 @@ export default {
         const since = (typeof s.lastReminder === 'number') ? (now - s.lastReminder) : Infinity;
         const hrsFed = s.lastFed ? (now - s.lastFed) / 3600000 : null;
 
-        // pick the most urgent applicable reminder + how long to wait between sends
-        let msg = null, gapH = 0;
+        // pick the most urgent applicable reminder. The first "hungry" alert of
+        // a feed cycle is sent IMMEDIATELY (once) the moment they hit 24h —
+        // bypassing the throttle — so it arrives as soon as they become hungry.
+        let msg = null, gapH = 0, immediate = false;
         if (hrsFed != null && hrsFed >= 60) {
           msg = { title: 'Critter Casino ⚠️', body: 'Your critters are STARVING and may start dying! Feed them now. 🐾' };
           gapH = 6;
-        } else if (hrsFed != null && hrsFed >= 23) {
-          msg = { title: 'Critter Casino 🍖', body: 'Your critters are hungry (earning only 25%) — feed them to restore full income!' };
+        } else if (hrsFed != null && hrsFed >= 24 && s.hungryNotified !== s.lastFed) {
+          msg = { title: 'Critter Casino 🍖', body: 'Your critters just got hungry (earning only 25%) — feed them to restore full income!' };
+          immediate = true;
+        } else if (hrsFed != null && hrsFed >= 24) {
+          msg = { title: 'Critter Casino 🍖', body: 'Your critters are still hungry — feed them to restore full income!' };
           gapH = 12;
         } else if (localHour === s.hour && s.active !== localDay) {
           msg = { title: 'Critter Casino 🎲', body: 'Daily rewards & ranch coins are waiting. 🐾' };
           gapH = 20;
         }
-        if (!msg || since < gapH * 3600000) continue;
+        if (!msg) continue;
+        if (!immediate && since < gapH * 3600000) continue;
 
         try {
           const res = await sendPush(s, { title: msg.title, body: msg.body, url: './' }, env);
           if (res.status === 404 || res.status === 410) {
             await env.SUBS.delete(entry.name); // subscription gone
           } else {
+            if (immediate) s.hungryNotified = s.lastFed; // mark this hunger cycle as alerted
             s.lastReminder = now;
             await env.SUBS.put(entry.name, JSON.stringify(s));
           }
