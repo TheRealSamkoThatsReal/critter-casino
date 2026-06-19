@@ -21,40 +21,44 @@
   // Resolve a wager with a payout multiplier (0 = total loss). On a win the
   // payout VALUE (stake*mult) is paid out as a set of creatures whose combined
   // value matches it — so you actually receive what the payout says.
-  const PAYOUT_CAP = 20; // max creatures awarded per game; leftover budget carries to the next game
+  // No creature-count cap, but awarded creatures never drop more than this many
+  // tiers below the LOWEST rarity you wagered — so a big win can't spill into a
+  // pile of commons. (Budget below the floor tier's value is dropped.)
+  const PAYOUT_FLOOR_DROP = 2;
+  const PAYOUT_GUARD = 2000; // anti-freeze safety only (not a meaningful cap)
   function resolve(wager, mult) {
     const s = G.state.get();
     const stake = stakeOf(wager);
+    // floor the payout tier at (lowest wagered rarity - 2)
+    let minTier = Infinity;
+    wager.forEach(function (it) { const sp = G.state.getSpecies(it.sid); if (sp) minTier = Math.min(minTier, sp.tier); });
+    const floorTier = Math.max(0, (isFinite(minTier) ? minTier : 0) - PAYOUT_FLOOR_DROP);
     wager.forEach(function (it) { G.state.removeInstance(it.iid); });
     s.stats.gambled++;
     if (!mult || mult <= 0) {
       s.stats.losses++;
       G.state.save();
-      // a loss doesn't touch carried winnings — they still wait for your next win
-      return { lost: true, count: wager.length, stake: stake, carried: s.carryBudget || 0 };
+      return { lost: true, count: wager.length, stake: stake };
     }
     let budget = Math.round(stake * mult * G.state.casinoLuckMult()); // High Roller (Stardust) boosts payout
     if (Math.random() < 0.07) budget = Math.round(budget * 1.5); // lucky crit bonus
-    const usedCarry = s.carryBudget || 0;
-    budget += usedCarry;        // fold in any leftover carried from a previous game
-    s.carryBudget = 0;
+    if (s.carryBudget) { budget += s.carryBudget; s.carryBudget = 0; } // absorb leftover from older versions
     const cap = G.state.maxTierUnlocked(); // rarities above are prestige-locked
+    const floorVal = G.data.rarity(floorTier).value;
     const items = [];
-    let remaining = budget;
-    while (remaining >= G.data.rarity(0).value && items.length < PAYOUT_CAP) {
-      let tier = 0; // highest affordable (& unlocked) tier for the remaining budget
-      for (let t = 0; t <= cap; t++) if (G.data.rarity(t).value <= remaining) tier = t;
+    let remaining = budget, guard = 0;
+    while (remaining >= floorVal && guard++ < PAYOUT_GUARD) {
+      let tier = floorTier; // highest affordable tier at or above the floor
+      for (let t = floorTier; t <= cap; t++) if (G.data.rarity(t).value <= remaining) tier = t;
       const sp = G.state.randomSpeciesAtTier(tier);
       if (!sp) break;
       items.push(G.state.addSpecies(sp.id, shiny()));
       remaining -= G.data.rarity(tier).value;
     }
-    if (!items.length) { const sp0 = G.state.randomSpeciesAtTier(0); if (sp0) items.push(G.state.addSpecies(sp0.id, false)); }
-    // anything past the cap carries into your next game so no payout is lost
-    s.carryBudget = Math.max(0, Math.round(remaining));
+    if (!items.length) { const sp0 = G.state.randomSpeciesAtTier(floorTier) || G.state.randomSpeciesAtTier(0); if (sp0) items.push(G.state.addSpecies(sp0.id, false)); }
     s.stats.wins++;
     G.state.save();
-    return { items: items, count: wager.length, stake: stake, mult: mult, carried: s.carryBudget, usedCarry: usedCarry };
+    return { items: items, count: wager.length, stake: stake, mult: mult };
   }
 
   // ---- multi-creature wager picker ----------------------------------------
@@ -127,8 +131,6 @@
       if (res.lost) {
         container.appendChild(el('div', { class: 'gresult bad', html:
           '💀 Lost! Your wager of ' + res.count + ' creature' + (res.count > 1 ? 's' : '') + ' (✨ ' + fmt(res.stake) + ') is gone.' }));
-        if (res.carried > 0) container.appendChild(el('div', { class: 'gsub', html:
-          '📦 You still have <b>✨ ' + fmt(res.carried) + '</b> carried over for your next win.' }));
       } else {
         if (G.fx) G.fx.celebrate(bestTier);
         const wonVal = res.items.reduce(function (a, it) { return a + G.state.valueOf(it); }, 0);
@@ -144,10 +146,7 @@
         arr.forEach(function (g) { grid.appendChild(G.ui.card(g.item, { size: 56, showValue: false, badge: g.n > 1 ? ('×' + g.n) : null })); });
         container.appendChild(grid);
         container.appendChild(el('div', { class: 'gsub', html:
-          'Staked ✨ ' + fmt(res.stake) + ' → won ✨ ' + fmt(wonVal) +
-          (res.usedCarry > 0 ? ' (incl. ✨ ' + fmt(res.usedCarry) + ' carried in)' : '') }));
-        if (res.carried > 0) container.appendChild(el('div', { class: 'gsub', html:
-          '📦 Hit the ' + res.items.length + '-creature cap — <b>✨ ' + fmt(res.carried) + '</b> carried to your next game!' }));
+          'Staked ✨ ' + fmt(res.stake) + ' → won ✨ ' + fmt(wonVal) }));
       }
       container.appendChild(el('button', { class: 'btn primary', text: 'Play again', onclick: onAgain }));
       if (window.refreshAll) window.refreshAll();
