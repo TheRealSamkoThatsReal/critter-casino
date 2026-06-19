@@ -40,15 +40,17 @@
   function rawIncomePerSec() {
     return G.state.get().inv.reduce(function (a, it) { return a + creatureIncome(it); }, 0);
   }
-  // gated by hunger: hungry/starving creatures produce nothing
+  // hungry/starving creatures still earn, just reduced
   function incomePerSec() {
-    return fedState() === 'fed' ? rawIncomePerSec() : 0;
+    return rawIncomePerSec() * hungerMult();
   }
 
   // ---- hunger / feeding ----------------------------------------------------
-  const FEED_MS = 24 * 3600 * 1000;    // income pauses after this long unfed
+  const FEED_MS = 24 * 3600 * 1000;    // income drops to 25% after this long unfed
   const STARVE_MS = 72 * 3600 * 1000;  // deaths begin after this long unfed
   const DEATH_PER_HOUR = 0.03;         // per creature, each hour while starving
+  const HUNGRY_MULT = 0.25;            // income multiplier while hungry/starving
+  function hungerMult() { return fedState() === 'fed' ? 1 : HUNGRY_MULT; }
 
   function msSinceFed() { const f = G.state.get().lastFed || Date.now(); return Math.max(0, Date.now() - f); }
   function hoursSinceFed() { return msSinceFed() / 3600000; }
@@ -97,13 +99,15 @@
     const now = Date.now();
     if (!s.lastTick) { s.lastTick = now; G.state.save(); return null; }
     const elapsed = Math.max(0, (now - s.lastTick) / 1000);
-    // income only accrues while fed (lastFed .. lastFed+24h), capped by offline cap.
-    // computed BEFORE deaths, since starvation deaths happen after the fed window.
+    // Income: full rate while fed (lastFed..lastFed+24h), 25% after, all within
+    // the offline cap. Computed BEFORE deaths (starvation happens after the fed window).
     const fedUntil = (s.lastFed || now) + FEED_MS;
-    const capMs = offlineCapSec() * 1000;
-    const earnEnd = Math.min(now, fedUntil, s.lastTick + capMs);
-    const earnSec = Math.max(0, (earnEnd - s.lastTick) / 1000);
-    const earned = rawIncomePerSec() * earnSec;
+    const start = s.lastTick;
+    const endCap = Math.min(now, start + offlineCapSec() * 1000);
+    const raw = rawIncomePerSec();
+    const fullSec = Math.max(0, (Math.min(endCap, fedUntil) - start) / 1000);
+    const hungrySec = Math.max(0, (endCap - Math.max(start, fedUntil)) / 1000);
+    const earned = raw * (fullSec + hungrySec * HUNGRY_MULT);
     if (earned > 0) s.coins += earned;
     s.lastTick = now;
     const died = processStarvation(now); // also saves if any died
@@ -131,8 +135,8 @@
     const st = fedState();
     const ms = msSinceFed();
     if (st === 'fed') return { cls: 'fed', icon: '🍖', text: 'Fed — hungry in ' + fmtDuration((FEED_MS - ms) / 1000) };
-    if (st === 'hungry') return { cls: 'hungry', icon: '🍽️', text: 'Hungry! Income paused — starving in ' + fmtDuration((STARVE_MS - ms) / 1000) };
-    return { cls: 'starving', icon: '💀', text: 'STARVING! Creatures may die each hour — feed now!' };
+    if (st === 'hungry') return { cls: 'hungry', icon: '🍽️', text: 'Hungry! Earning 25% — starving in ' + fmtDuration((STARVE_MS - ms) / 1000) };
+    return { cls: 'starving', icon: '💀', text: 'STARVING! 25% income & may die hourly — feed now!' };
   }
 
   function updateLive() {
@@ -141,7 +145,7 @@
     if (coinEl) coinEl.textContent = fmt(s.coins);
     const st = fedState();
     const inc = document.getElementById('idle-income');
-    if (inc) inc.textContent = st === 'fed' ? ('⛁ ' + fmtRate(incomePerSec()) + ' /s') : '⛁ 0 /s 🍽️';
+    if (inc) inc.textContent = '⛁ ' + fmtRate(incomePerSec()) + ' /s' + (st === 'fed' ? '' : ' 🍽️');
     const bal = document.getElementById('idle-balance');
     if (bal) bal.textContent = '⛁ ' + fmt(s.coins);
     document.querySelectorAll('.idle-buy').forEach(function (b) {
@@ -186,7 +190,7 @@
     const st = fedState();
     if (st !== 'fed') {
       node.appendChild(el('div', { class: 'gsub', text:
-        '⚠️ Your creatures are ' + (st === 'starving' ? 'STARVING and dying' : 'hungry and not earning') + '.' }));
+        '⚠️ Your creatures are ' + (st === 'starving' ? 'STARVING (25% income) and dying' : 'hungry — earning only 25%') + '.' }));
     }
     const m = G.ui.modal('', node);
     const acts = [];

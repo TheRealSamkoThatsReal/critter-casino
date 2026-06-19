@@ -106,7 +106,7 @@ export default {
           msg = { title: 'Critter Casino ⚠️', body: 'Your critters are STARVING and may start dying! Feed them now. 🐾' };
           gapH = 6;
         } else if (hrsFed != null && hrsFed >= 23) {
-          msg = { title: 'Critter Casino 🍖', body: 'Your critters are hungry — feed them to keep earning coins!' };
+          msg = { title: 'Critter Casino 🍖', body: 'Your critters are hungry (earning only 25%) — feed them to restore full income!' };
           gapH = 12;
         } else if (localHour === s.hour && s.active !== localDay) {
           msg = { title: 'Critter Casino 🎲', body: 'Daily rewards & ranch coins are waiting. 🐾' };
