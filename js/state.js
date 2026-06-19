@@ -17,6 +17,14 @@
     discovered: {},     // Critterdex: every species id ever owned (persists across sell/gamble)
     newSpecies: {},     // species discovered but not yet viewed (shows a NEW badge)
     prestige: 0,        // number of times prestiged (permanent income multiplier)
+    stardust: 0,            // ⭐ permanent meta-currency (persists across prestige)
+    stardustUpgrades: {},   // {id: level} — permanent upgrade tree
+    runCoinsEarned: 0,      // coins earned since last prestige (drives Stardust reward)
+    lifetimeCoins: 0,       // total coins ever earned (milestones / records)
+    peakCoins: 0,           // highest balance ever held (records)
+    modsGained: 0,          // lifetime income modifiers grown (records)
+    bmBuys: 0,              // black-market purchases this run (price escalation)
+    claimedMilestones: {},  // milestone amount -> 1
     stats: { hatched: 0, gambled: 0, wins: 0, losses: 0, traded: 0 },
     adminPass: 'admin',
     seenAdmin: false
@@ -93,12 +101,13 @@
     return allSpecies().filter(function (s) { return s.tier === tier; });
   }
 
-  // value of an instance
+  // value of an instance (incl. the Fortune Stardust upgrade)
   function valueOf(item) {
     const sp = getSpecies(item.sid);
     if (!sp) return 0;
-    const base = G.data.rarity(sp.tier).value;
-    return item.shiny ? base * 5 : base;
+    let base = G.data.rarity(sp.tier).value;
+    if (item.shiny) base *= 5;
+    return Math.round(base * (1 + sdLinear('value')));
   }
 
   // gacha: pick a random species weighted by rarity weights.
@@ -179,7 +188,76 @@
 
   // coins are kept as a float so sub-1/sec idle income isn't lost to rounding;
   // the UI rounds for display.
-  function addCoins(n) { state.coins = Math.max(0, state.coins + n); save(); }
+  function trackEarn(n) {
+    if (n <= 0) return;
+    state.runCoinsEarned = (state.runCoinsEarned || 0) + n;
+    state.lifetimeCoins = (state.lifetimeCoins || 0) + n;
+  }
+  function addCoins(n) {
+    state.coins = Math.max(0, state.coins + n);
+    if (n > 0) trackEarn(n);
+    if (state.coins > (state.peakCoins || 0)) state.peakCoins = state.coins;
+    save();
+  }
+  // idle income path: add coins + track earnings WITHOUT saving (caller batches saves)
+  function earn(n) {
+    if (n <= 0) return;
+    state.coins += n;
+    trackEarn(n);
+    if (state.coins > (state.peakCoins || 0)) state.peakCoins = state.coins;
+  }
+
+  // ---- Stardust meta-currency ---------------------------------------------
+  function sdDef(id) { return G.data.STARDUST_UPGRADES.filter(function (u) { return u.id === id; })[0]; }
+  function sdLevel(id) { return (state.stardustUpgrades || {})[id] || 0; }
+  function sdLinear(id) { const d = sdDef(id); return d ? d.per * sdLevel(id) : 0; } // additive effect
+  function sdCost(id) { const d = sdDef(id); return d ? Math.floor(d.base * Math.pow(d.growth, sdLevel(id))) : Infinity; }
+  function buyStardust(id) {
+    const d = sdDef(id); if (!d) return false;
+    const lvl = sdLevel(id);
+    if (lvl >= d.max) return false;
+    const cost = sdCost(id);
+    if ((state.stardust || 0) < cost) return false;
+    state.stardust -= cost;
+    if (!state.stardustUpgrades) state.stardustUpgrades = {};
+    state.stardustUpgrades[id] = lvl + 1;
+    save();
+    return true;
+  }
+  // effect getters used across the game
+  function stardustIncomeMult() { return 1 + sdLinear('income'); }
+  function casinoLuckMult() { return 1 + sdLinear('casino'); }
+  function modRateMult() { return 1 + sdLinear('modrate'); }
+  function shinyBonus() { return sdLinear('shiny'); }
+  function nestKeepFrac() { return sdLinear('nest'); }
+  function compounderMult() { return 1 + sdLinear('compound'); }
+  function rollShiny(base) { return Math.random() < ((base || 0) + shinyBonus()); }
+
+  // Stardust granted if you prestige right now: sqrt curve on coins earned this
+  // run, boosted by the Compounder upgrade. Banking/spending coins => more power.
+  function stardustReward() {
+    const earned = state.runCoinsEarned || 0;
+    if (earned < 1e5) return 0; // need ~100k earned in a run to start yielding
+    const base = 8 * Math.sqrt(earned / 1e6);
+    return Math.max(1, Math.floor(base * compounderMult()));
+  }
+
+  // grant any newly-reached lifetime-coin milestones; returns [{amt, sd}] granted
+  function checkMilestones() {
+    const got = [];
+    if (!state.claimedMilestones) state.claimedMilestones = {};
+    G.data.COIN_MILESTONES.forEach(function (m) {
+      const key = String(m.amt);
+      if (!state.claimedMilestones[key] && (state.lifetimeCoins || 0) >= m.amt) {
+        state.claimedMilestones[key] = 1;
+        state.stardust = (state.stardust || 0) + m.sd;
+        got.push(m);
+      }
+    });
+    if (got.length) save();
+    return got;
+  }
+  function noteModifierGained(n) { state.modsGained = (state.modsGained || 0) + (n || 1); }
 
   // ---- prestige (collect every base creature -> reset for a permanent bonus)
   // Completion is based on the built-in roster only, so admin-added creatures
@@ -208,10 +286,16 @@
 
   function doPrestige() {
     if (!canPrestige()) return false;
+    // award Stardust for the run before wiping it, and honour the Nest Egg keep
+    const reward = stardustReward();
+    state.stardust = (state.stardust || 0) + reward;
+    const kept = Math.floor((state.coins || 0) * nestKeepFrac());
     state.prestige = (state.prestige || 0) + 1;
     // hard reset of the run, keeping identity, custom species, lifetime stats
     state.inv = [];
-    state.coins = 250;
+    state.coins = Math.max(250, kept);
+    state.runCoinsEarned = 0;
+    state.bmBuys = 0;
     state.upgrades = {};
     state.cooldowns = {};
     state.discovered = {};
@@ -244,6 +328,20 @@
     getInstance: getInstance,
     isNew: isNew, markSeen: markSeen, newCount: newCount,
     addCoins: addCoins,
+    earn: earn,
+    valueMult: function () { return 1 + sdLinear('value'); },
+    stardustIncomeMult: stardustIncomeMult,
+    casinoLuckMult: casinoLuckMult,
+    modRateMult: modRateMult,
+    shinyBonus: shinyBonus,
+    rollShiny: rollShiny,
+    nestKeepFrac: nestKeepFrac,
+    compounderMult: compounderMult,
+    sdLevel: sdLevel, sdLinear: sdLinear, sdCost: sdCost, sdDef: sdDef,
+    buyStardust: buyStardust,
+    stardustReward: stardustReward,
+    checkMilestones: checkMilestones,
+    noteModifierGained: noteModifierGained,
     dexProgress: dexProgress,
     canPrestige: canPrestige,
     prestigeLevel: prestigeLevel,

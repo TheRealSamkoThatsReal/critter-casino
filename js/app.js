@@ -26,6 +26,21 @@
     return G.state.get().inv.reduce(function (a, it) { return a + G.state.valueOf(it); }, 0);
   }
 
+  // upgrading a modifier costs coins scaled by the creature's value and the
+  // target tier — a steep, scaling coin sink. You still must EARN the first
+  // modifier from the Ranch; coins only let you push it higher.
+  const MOD_UPGRADE_FACTOR = [0, 50, 250, 1500]; // indexed by target modifier tier
+  function nextModId(curId) {
+    const list = G.data.MODIFIERS, i = list.findIndex(function (m) { return m.id === curId; });
+    return (i >= 0 && i + 1 < list.length) ? list[i + 1].id : null;
+  }
+  function modUpgradeCost(item) {
+    const next = nextModId(item.mod);
+    if (!next) return Infinity;
+    const idx = G.data.MODIFIERS.findIndex(function (m) { return m.id === next; });
+    return Math.round(G.state.valueOf(item) * MOD_UPGRADE_FACTOR[idx]);
+  }
+
   function detail(item) {
     const sp = G.state.getSpecies(item.sid);
     const r = G.data.rarity(sp.tier);
@@ -43,15 +58,29 @@
       '<span class="pill">✨ ' + fmt(G.state.valueOf(item)) + '</span> ' +
       '<span class="pill">📈 ⛁ ' + G.idle.fmtRate(G.idle.creatureIncome(item)) + '/s</span>' }));
     const m = G.ui.modal(sp.name, node);
-    node.appendChild(el('div', { class: 'gaction' }, [
-      el('button', { class: 'btn', text: '💰 Sell for ⛁ ' + fmt(G.state.valueOf(item)), onclick: function () {
-        const v = G.state.valueOf(item);
-        G.state.removeInstance(item.iid);
-        G.state.addCoins(v);
-        m.close(); toast('Sold ' + sp.name + ' for ' + fmt(v) + ' coins.', 'good');
-        refreshAll();
-      } })
-    ]));
+    const actions = [];
+    const upId = item.mod ? nextModId(item.mod) : null;
+    if (upId) {
+      const nm = G.data.modifier(upId), cost = modUpgradeCost(item);
+      const ub = el('button', { class: 'btn primary', html: '⬆ Upgrade to ' + nm.icon + ' ' + nm.name + ' — ⛁ ' + fmt(cost) });
+      ub.addEventListener('click', function () {
+        if (G.state.get().coins < cost) { toast('Not enough coins.', 'bad'); return; }
+        G.state.addCoins(-cost);
+        item.mod = upId; G.state.save();
+        G.ui.haptic([20, 30, 60]);
+        toast(sp.name + ' is now ' + nm.name + '! ×' + nm.mult + ' income', 'good');
+        m.close(); refreshAll(); detail(item);
+      });
+      actions.push(ub);
+    }
+    actions.push(el('button', { class: 'btn', text: '💰 Sell for ⛁ ' + fmt(G.state.valueOf(item)), onclick: function () {
+      const v = G.state.valueOf(item);
+      G.state.removeInstance(item.iid);
+      G.state.addCoins(v);
+      m.close(); toast('Sold ' + sp.name + ' for ' + fmt(v) + ' coins.', 'good');
+      refreshAll();
+    } }));
+    node.appendChild(el('div', { class: 'gaction' }, actions));
   }
 
   function stat(b, span) { return el('div', { class: 'stat' }, [el('b', { text: b }), el('span', { text: span })]); }
@@ -213,7 +242,7 @@
     if (egg.cost > 0) G.state.addCoins(-eggCost(egg));
     const sp = egg.special === 'dex' ? G.state.dailyPick() : G.state.randomSpecies(egg.min, egg.max);
     if (!sp) { toast('No creatures available.', 'bad'); return; }
-    const isShiny = Math.random() < egg.shiny;
+    const isShiny = G.state.rollShiny(egg.shiny);
     const inst = G.state.addSpecies(sp.id, isShiny);
     s.stats.hatched++;
     G.state.save();
@@ -235,7 +264,7 @@
     for (let i = 0; i < n; i++) {
       const sp = G.state.randomSpecies(egg.min, egg.max);
       if (!sp) break;
-      results.push(G.state.addSpecies(sp.id, Math.random() < egg.shiny));
+      results.push(G.state.addSpecies(sp.id, G.state.rollShiny(egg.shiny)));
     }
     s.stats.hatched += results.length;
     G.state.save();
@@ -264,16 +293,27 @@
     const info = el('div', { class: 'wager-total' });
     const tools = el('div', { class: 'wager-tools' });
     const grid = el('div', { class: 'grid pick-grid' });
-    wrap.appendChild(info); wrap.appendChild(tools); wrap.appendChild(grid);
+    let forceShiny = false;
+    const shinyChk = el('input', { type: 'checkbox' });
+    const shinyTxt = el('span', { class: 'fuse-shiny-txt' });
+    const shinyRow = el('label', { class: 'fuse-shiny' }, [shinyChk, shinyTxt]);
+    shinyChk.addEventListener('change', function () { forceShiny = shinyChk.checked; update(); });
+    wrap.appendChild(info); wrap.appendChild(shinyRow); wrap.appendChild(tools); wrap.appendChild(grid);
     const goBtn = el('button', { class: 'btn primary' });
     const m = G.ui.modal('🔥 Fuse', wrap, { footer: goBtn });
     let tier = opts[0], selected = {}, cardByIid = {};
 
+    function shinyCost() { return G.data.rarity(tier + 1).value * 4; }
     function update() {
       const n = Object.keys(selected).length, groups = Math.floor(n / 3);
+      const sc = shinyCost(), totalSc = forceShiny ? sc * groups : 0;
       info.innerHTML = 'Selected <b>' + n + '</b> · fuse into <b>' + groups + ' ' + G.data.rarity(tier + 1).name + '</b>';
-      goBtn.disabled = groups < 1;
-      goBtn.textContent = groups < 1 ? 'Select 3+' : ('🔥 Fuse ×' + groups);
+      shinyTxt.innerHTML = '✨ Guarantee shiny — ⛁ ' + fmt(sc) + ' each';
+      const broke = forceShiny && G.state.get().coins < totalSc;
+      goBtn.disabled = groups < 1 || broke;
+      goBtn.textContent = groups < 1 ? 'Select 3+'
+        : broke ? ('Need ⛁ ' + fmt(totalSc))
+        : ('🔥 Fuse ×' + groups + (forceShiny ? ' · ✨ ⛁ ' + fmt(totalSc) : ''));
     }
     function rebuild() {
       selected = {}; cardByIid = {}; grid.innerHTML = ''; tools.innerHTML = '';
@@ -294,13 +334,18 @@
       const items = Object.keys(selected).map(function (k) { return selected[k]; });
       const groups = Math.floor(items.length / 3);
       if (groups < 1) return;
+      if (forceShiny) {
+        const cost = shinyCost() * groups;
+        if (G.state.get().coins < cost) { toast('Not enough coins for guaranteed shiny.', 'bad'); return; }
+        G.state.addCoins(-cost);
+      }
       const results = [];
       for (let i = 0; i < groups; i++) {
         const trio = items.slice(i * 3, i * 3 + 3);
         const allShiny = trio.every(function (it) { return it.shiny; });
         trio.forEach(function (it) { G.state.removeInstance(it.iid); });
         const sp = G.state.randomSpeciesAtTier(tier + 1);
-        if (sp) results.push(G.state.addSpecies(sp.id, allShiny || Math.random() < 0.03));
+        if (sp) results.push(G.state.addSpecies(sp.id, forceShiny || allShiny || G.state.rollShiny(0.03)));
       }
       G.state.save();
       G.ui.haptic([20, 30, 60]);
@@ -360,6 +405,49 @@
     if (s >= 60) return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
     return s + 's';
   }
+  // ---- black market: buy a guaranteed undiscovered creature (coins -> dex) --
+  const BM_BASE = 2500, BM_GROWTH = 1.8;
+  function bmPrice() {
+    return Math.round(BM_BASE * G.state.progressScale() * Math.pow(BM_GROWTH, G.state.get().bmBuys || 0));
+  }
+  function bmUndiscovered() {
+    const cap = G.state.maxTierUnlocked(), disc = G.state.get().discovered;
+    return G.state.allSpecies().filter(function (sp) { return sp.tier <= cap && !disc[sp.id]; });
+  }
+  function buyBlackMarket(container) {
+    const s = G.state.get();
+    const pool = bmUndiscovered();
+    if (!pool.length) { toast('Every unlocked creature is already discovered!', ''); return; }
+    const price = bmPrice();
+    if (s.coins < price) { toast('Not enough coins.', 'bad'); return; }
+    G.state.addCoins(-price);
+    s.bmBuys = (s.bmBuys || 0) + 1;
+    const sp = pool[Math.floor(Math.random() * pool.length)];
+    const inst = G.state.addSpecies(sp.id, G.state.rollShiny(0.03));
+    s.stats.hatched++;
+    G.state.save();
+    G.ui.haptic([15, 30, 50]);
+    G.ui.reveal(inst, '🕵️ Black market find!');
+    if (window.refreshAll) window.refreshAll();
+    renderHatch(container);
+  }
+  function blackMarketPanel(container) {
+    const s = G.state.get(), pool = bmUndiscovered(), price = bmPrice();
+    const panel = el('div', { class: 'panel bm-panel' }, [el('h3', { text: '🕵️ Black Market' })]);
+    panel.appendChild(el('p', { class: 'gdesc', text:
+      'Buy a creature you haven\'t discovered yet — progress straight toward your next prestige. Price rises with each purchase this run.' }));
+    if (!pool.length) {
+      panel.appendChild(el('div', { class: 'gsub', text: '✅ You\'ve discovered every unlocked creature. Prestige to unlock more.' }));
+    } else {
+      const b = el('button', { class: 'btn primary', html: '🛒 Buy undiscovered — ⛁ ' + fmt(price) });
+      b.disabled = s.coins < price;
+      b.addEventListener('click', function () { buyBlackMarket(container); });
+      panel.appendChild(b);
+      panel.appendChild(el('div', { class: 'gsub', text: pool.length + ' undiscovered creature' + (pool.length !== 1 ? 's' : '') + ' remaining at your tier.' }));
+    }
+    container.appendChild(panel);
+  }
+
   let cdTimer = null;
   function renderHatch(container) {
     container.innerHTML = '';
@@ -392,6 +480,7 @@
       grid.appendChild(tile);
     });
     container.appendChild(grid);
+    blackMarketPanel(container);
     // cooldown ticker
     if (cdTimer) clearInterval(cdTimer);
     cdTimer = setInterval(function () {

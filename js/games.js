@@ -30,7 +30,7 @@
       G.state.save();
       return { lost: true, count: wager.length, stake: stake };
     }
-    let budget = Math.round(stake * mult); // no prestige tax on casino winnings
+    let budget = Math.round(stake * mult * G.state.casinoLuckMult()); // High Roller (Stardust) boosts payout
     if (Math.random() < 0.07) budget = Math.round(budget * 1.5); // lucky crit bonus
     const cap = G.state.maxTierUnlocked(); // rarities above are prestige-locked
     const items = [];

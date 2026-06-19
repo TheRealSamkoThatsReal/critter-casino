@@ -36,7 +36,7 @@
     let v = RATE[sp.tier] * (item.shiny ? 5 : 1);
     if (sp.tier >= 2) v *= rarityMult();
     v *= G.data.modMult(item.mod); // rare income modifier (ranch-grown)
-    return v * habitatMult() * G.state.prestigeMult();
+    return v * habitatMult() * G.state.prestigeMult() * G.state.stardustIncomeMult();
   }
   function rawIncomePerSec() {
     return G.state.get().inv.reduce(function (a, it) { return a + creatureIncome(it); }, 0);
@@ -132,18 +132,19 @@
     if (hours <= 0) return [];
     const loopHours = Math.min(hours, 2000); // bound the loop for very long gaps
     s.lastModRoll = hours > 2000 ? now : from + hours * 3600000;
+    const rate = MOD_PER_HOUR * G.state.modRateMult(); // Modifier Affinity (Stardust) boosts this
     const gained = [];
     for (let h = 0; h < loopHours; h++) {
       for (let i = 0; i < s.inv.length; i++) {
         const it = s.inv[i];
         if (it.mod) continue; // one modifier per creature, no re-rolls
-        if (Math.random() < MOD_PER_HOUR) {
+        if (Math.random() < rate) {
           it.mod = G.data.rollModifierId();
           gained.push({ item: it, mod: it.mod });
         }
       }
     }
-    if (gained.length) G.state.save();
+    if (gained.length) { G.state.noteModifierGained(gained.length); G.state.save(); }
     return gained;
   }
 
@@ -157,6 +158,15 @@
     });
     if (gained.length > 3) toast('✦ ' + (gained.length - 3) + ' more creatures gained modifiers!', 'good');
     G.ui.haptic([15, 30, 15, 30, 60]);
+  }
+
+  // celebratory toast(s) when a lifetime-coin milestone awards Stardust
+  function announceMilestones(got) {
+    if (!got || !got.length) return;
+    got.forEach(function (m) {
+      toast('🏆 ' + fmt(m.amt) + ' coins earned! +⭐ ' + m.sd + ' Stardust', 'good');
+    });
+    G.ui.haptic([20, 40, 80]);
   }
 
   // ---- offline / ticking ---------------------------------------------------
@@ -174,7 +184,7 @@
     const fullSec = Math.max(0, (Math.min(endCap, fedUntil) - start) / 1000);
     const hungrySec = Math.max(0, (endCap - Math.max(start, fedUntil)) / 1000);
     const earned = raw * (fullSec + hungrySec * HUNGRY_MULT);
-    if (earned > 0) s.coins += earned;
+    if (earned > 0) G.state.earn(earned);
     s.lastTick = now;
     const died = processStarvation(now); // also saves if any died
     const mods = processModifiers(now);  // also saves if any granted
@@ -186,9 +196,10 @@
   function tick() {
     const s = G.state.get();
     const inc = incomePerSec(); // 0 when hungry/starving
-    if (inc > 0) s.coins += inc; // one second's worth
+    if (inc > 0) G.state.earn(inc); // one second's worth (tracked for Stardust/milestones)
     processStarvation(Date.now()); // acts only when a whole starving hour elapses
     announceModifiers(processModifiers(Date.now())); // rare modifier grants (acts hourly)
+    announceMilestones(G.state.checkMilestones()); // lifetime-coin Stardust rewards
     ticks++;
     if (ticks % 10 === 0) { s.lastTick = Date.now(); G.state.save(); }
     updateLive();
@@ -313,6 +324,88 @@
     render(document.getElementById('view'));
   }
 
+  // ---- Stardust (permanent meta-currency) ---------------------------------
+  function sdPct(def, level) { return Math.round(def.per * level * 100); }
+  function sdEffectText(def, level) {
+    if (def.id === 'nest') return level ? ('Keeping ' + sdPct(def, level) + '% of coins through prestige') : 'No coins kept through prestige yet';
+    return level ? ('+' + sdPct(def, level) + '% ' + def.desc) : ('+0% ' + def.desc);
+  }
+  function buySD(id) {
+    if (G.state.buyStardust(id)) {
+      G.ui.haptic(20);
+      const d = G.state.sdDef(id);
+      toast(d.icon + ' ' + d.name + ' Lv ' + G.state.sdLevel(id) + '!', 'good');
+      render(document.getElementById('view'));
+    } else { toast('Not enough Stardust.', 'bad'); }
+  }
+  function stardustPanel(container) {
+    const s = G.state.get();
+    const proj = G.state.stardustReward();
+    const head = el('div', { class: 'sd-head' }, [
+      el('div', { class: 'sd-bal', html: '⭐ <b>' + fmt(s.stardust || 0) + '</b> Stardust' }),
+      el('div', { class: 'sd-sub', text: 'Permanent upgrades — kept through every prestige.' })
+    ]);
+    const wrap = el('div', { class: 'idle-upgrades' });
+    G.data.STARDUST_UPGRADES.forEach(function (def) {
+      const level = G.state.sdLevel(def.id);
+      const maxed = level >= def.max;
+      const cost = G.state.sdCost(def.id);
+      const tile = el('div', { class: 'upgrade-tile sd-tile' }, [
+        el('div', { class: 'up-icon', text: def.icon }),
+        el('div', { class: 'up-main' }, [
+          el('div', { class: 'up-name', text: def.name + ' ' + (maxed ? '(MAX)' : 'Lv ' + level) }),
+          el('div', { class: 'up-desc', text: sdEffectText(def, level) })
+        ]),
+        maxed
+          ? el('button', { class: 'btn small', disabled: 'disabled', text: 'MAX' })
+          : (function () {
+              const b = el('button', { class: 'btn small primary', text: '⭐ ' + fmt(cost),
+                onclick: function () { buySD(def.id); } });
+              b.disabled = (s.stardust || 0) < cost;
+              return b;
+            })()
+      ]);
+      wrap.appendChild(tile);
+    });
+    const panel = el('div', { class: 'panel sd-panel' }, [
+      el('h3', { text: '⭐ Stardust' }), head, wrap
+    ]);
+    if (proj > 0) panel.appendChild(el('div', { class: 'sd-proj', html: 'Prestige now to earn <b>⭐ ' + fmt(proj) + '</b> Stardust.' }));
+    container.appendChild(panel);
+  }
+
+  // ---- records / milestones scoreboard ------------------------------------
+  function openRecords() {
+    const s = G.state.get();
+    const rows = [
+      ['💰 Lifetime coins earned', fmt(s.lifetimeCoins || 0)],
+      ['📈 Peak balance', fmt(s.peakCoins || 0)],
+      ['⭐ Stardust', fmt(s.stardust || 0)],
+      ['✨ Prestiges', String(s.prestige || 0)],
+      ['🥚 Creatures hatched', fmt(s.stats.hatched || 0)],
+      ['🎰 Casino plays', fmt(s.stats.gambled || 0) + ' (' + fmt(s.stats.wins || 0) + 'W / ' + fmt(s.stats.losses || 0) + 'L)'],
+      ['🧬 Modifiers grown', fmt(s.modsGained || 0)],
+      ['🤝 Trades', fmt(s.stats.traded || 0)]
+    ];
+    const node = el('div', {});
+    const tbl = el('div', { class: 'records' });
+    rows.forEach(function (r) {
+      tbl.appendChild(el('div', { class: 'rec-row' }, [el('span', { class: 'rec-k', text: r[0] }), el('span', { class: 'rec-v', text: r[1] })]));
+    });
+    node.appendChild(tbl);
+    node.appendChild(el('h3', { class: 'rec-h', text: '🏆 Coin Milestones' }));
+    const next = G.data.COIN_MILESTONES.filter(function (m) { return !(s.claimedMilestones || {})[String(m.amt)]; })[0];
+    if (next) {
+      const pct = Math.min(100, Math.floor((s.lifetimeCoins || 0) / next.amt * 100));
+      node.appendChild(el('div', { class: 'gsub', html: 'Next: earn <b>' + fmt(next.amt) + '</b> lifetime coins → <b>⭐ ' + next.sd + '</b> (' + pct + '%)' }));
+      const fill = el('div', { class: 'pbar-fill' }); fill.style.width = pct + '%';
+      node.appendChild(el('div', { class: 'pbar' }, [fill]));
+    } else {
+      node.appendChild(el('div', { class: 'gsub', text: 'All coin milestones claimed! 🎉' }));
+    }
+    G.ui.modal('🏆 Records', node);
+  }
+
   // ---- prestige ------------------------------------------------------------
   function nextUnlockName() {
     const t = G.state.maxTierUnlocked() + 1;
@@ -324,10 +417,14 @@
     const bonus = Math.round((0.5 * next) * 100);
     const unlock = nextUnlockName();
     const node = el('div', {});
+    const proj = G.state.stardustReward();
+    const keepPct = Math.round(G.state.nestKeepFrac() * 100);
     node.appendChild(el('p', { class: 'gdesc', html:
-      'Prestiging <b>resets</b> your creatures, coins, and Ranch upgrades — and clears your Critterdex.<br><br>' +
+      'Prestiging <b>resets</b> your creatures, ' + (keepPct ? 'most ' : '') + 'coins, and Ranch upgrades — and clears your Critterdex.<br><br>' +
       'In return you gain a <b>permanent +50% income</b> (total +' + bonus + '% after this)' +
       (unlock ? ' and <b>unlock the ' + unlock + ' rarity</b>' : '') +
+      (proj > 0 ? ' and <b>⭐ ' + fmt(proj) + ' Stardust</b>' : '') +
+      (keepPct ? ' (Nest Egg keeps ' + keepPct + '% of your coins)' : '') +
       ', then collect them all again to prestige higher.' }));
     const m = G.ui.modal('Prestige?', node);
     node.appendChild(el('div', { class: 'gaction' }, [
@@ -386,6 +483,8 @@
     fill.style.width = pct + '%';
     card.appendChild(el('div', { class: 'pbar' }, [fill]));
     card.appendChild(el('div', { class: 'prestige-prog', text: 'Critterdex: ' + p.have + ' / ' + p.total + ' (' + pct + '%)' }));
+    const proj = G.state.stardustReward();
+    if (proj > 0) card.appendChild(el('div', { class: 'prestige-sd', html: '⭐ Earns <b>' + fmt(proj) + '</b> Stardust on prestige' }));
     const btn = el('button', { class: 'btn primary',
       text: ready ? (nxt ? '✨ Prestige → unlock ' + nxt : '✨ Prestige now') : '🔍 See what\'s left' });
     btn.addEventListener('click', function () { if (G.state.canPrestige()) confirmPrestige(); else showMissing(); });
@@ -399,6 +498,9 @@
     container.appendChild(el('h2', { class: 'view-title', text: '🏡 Ranch' }));
     container.appendChild(el('p', { class: 'view-sub', text:
       'Your creatures earn coins over time based on rarity — even while the app is closed. Spend coins on upgrades to earn faster.' }));
+    container.appendChild(el('div', { class: 'rec-bar' }, [
+      el('button', { class: 'btn small', text: '🏆 Records', onclick: openRecords })
+    ]));
 
     feedingPanel(container);
     prestigePanel(container);
@@ -469,6 +571,7 @@
     container.appendChild(el('div', { class: 'panel' }, [
       el('h3', { text: '⚡ Upgrades' }), upWrap
     ]));
+    stardustPanel(container);
     updateLive();
   }
 

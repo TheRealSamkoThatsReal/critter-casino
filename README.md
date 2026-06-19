@@ -55,11 +55,27 @@ with **no backend required**, hosted on GitHub Pages.
   them, slowly, so they feel earned. You're told when one appears (a toast, or in
   the welcome-back screen if it happened offline), and a modified creature shows a
   coloured corner gem and aura on its card.
+- **⭐ Stardust + permanent upgrade tree (long-game economy)** — prestiging grants
+  **Stardust** scaled by the coins you earned that run (a square-root curve, boosted
+  by the Compounder), so *banking and spending coins permanently increases your
+  power*. Stardust buys a tree that persists across every prestige: **Golden Touch**
+  (global income), **Fortune** (creature value), **High Roller** (casino payout),
+  **Modifier Affinity** (ranch modifier rate), **Lucky Hatch** (shiny chance),
+  **Nest Egg** (keep a % of coins through prestige), and **Stardust Compounder**.
+- **Coins → power sinks** so money matters at every scale: **upgrade a creature's
+  income modifier** (Gilded→Radiant→Mythical→Ascendant) for coins, **guarantee a
+  shiny** when fusing, and a **🕵️ Black Market** that sells a guaranteed
+  *undiscovered* creature at an escalating price — turning coins straight into
+  prestige progress.
+- **🏆 Records & milestones** — a scoreboard (lifetime/peak coins, prestiges,
+  modifiers grown, casino record) plus **lifetime-coin milestones** (1M, 10M, … up
+  to 1Qi) that each pay a one-time Stardust bonus. Big numbers render with
+  k/M/B/T/Qa… suffixes.
 - **Prestige** — a persistent **Critterdex** tracks every species you've ever
   owned. Discover all currently-unlocked creatures and you can prestige: your run
-  (creatures, coins, Ranch upgrades, dex) resets in exchange for a **permanent
-  +50% income** bonus that stacks every prestige **and unlocks the next rarity
-  tier** (Prestige 1 → Celestial … Prestige 6 → Omega). Rarities above your
+  (creatures, most coins, Ranch upgrades, dex) resets in exchange for a **permanent
+  +50% income** bonus that stacks every prestige, **Stardust**, **and unlocks the
+  next rarity tier** (Prestige 1 → Celestial … Prestige 6 → Omega). Rarities above your
   prestige level are locked out of hatching and the casino, and the completion
   bar grows to include each newly unlocked tier. **Costs scale up each prestige**
   (egg prices and the casino value-to-tier mapping ×1.6^prestige), outpacing the

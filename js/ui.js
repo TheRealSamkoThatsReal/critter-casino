@@ -22,11 +22,20 @@
     return e;
   }
 
+  // short suffixes: k, M, B, T, then Qa, Qi, Sx, Sp, Oc, No, Dc, ... (every 1e3)
+  const SUFFIX = ['', 'k', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc', 'UDc', 'DDc', 'TDc'];
   function fmt(n) {
     n = Math.round(n);
-    if (n >= 1e6) return (n / 1e6).toFixed(n % 1e6 ? 1 : 0) + 'M';
-    if (n >= 1e4) return (n / 1e3).toFixed(n % 1e3 ? 1 : 0) + 'k';
-    return String(n);
+    if (!isFinite(n)) return n > 0 ? '∞' : '0';
+    if (n < 0) return '-' + fmt(-n);
+    if (n < 1e4) return String(n);
+    let tier = 0, v = n;
+    while (v >= 1000 && tier < SUFFIX.length - 1) { v /= 1000; tier++; }
+    let digits = v >= 100 ? 0 : v >= 10 ? 1 : 2;
+    let s = v.toFixed(digits);
+    if (parseFloat(s) >= 1000 && tier < SUFFIX.length - 1) { v /= 1000; tier++; digits = v >= 100 ? 0 : v >= 10 ? 1 : 2; s = v.toFixed(digits); }
+    if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, ''); // trim trailing zeros after the decimal only
+    return s + SUFFIX[tier];
   }
 
   // Haptic feedback via the Vibration API (Android/Chromium). Silently no-ops

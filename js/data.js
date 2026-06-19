@@ -113,12 +113,36 @@
     return MODIFIERS[0].id;
   }
 
+  // ⭐ Stardust: a permanent meta-currency earned on prestige (scaled by the
+  // coins you earned that run). Spent on a tree of upgrades that persist across
+  // every prestige — this is what makes coins matter long-term. `per` is the
+  // additive effect per level; `base`/`growth` give the Stardust cost curve.
+  const STARDUST_UPGRADES = [
+    { id: 'income',   icon: '⭐', name: 'Golden Touch',        per: 0.25, base: 3,  growth: 1.55, max: Infinity, fmt: 'income', desc: 'income from every creature' },
+    { id: 'value',    icon: '✨', name: 'Fortune',             per: 0.10, base: 5,  growth: 1.7,  max: 15,       fmt: 'value',  desc: 'creature value (sells & wagers)' },
+    { id: 'casino',   icon: '🍀', name: 'High Roller',         per: 0.08, base: 5,  growth: 1.7,  max: 12,       fmt: 'casino', desc: 'casino payout' },
+    { id: 'modrate',  icon: '🧬', name: 'Modifier Affinity',   per: 0.40, base: 8,  growth: 2.0,  max: 6,        fmt: 'rate',   desc: 'chance creatures grow a modifier' },
+    { id: 'shiny',    icon: '🌟', name: 'Lucky Hatch',         per: 0.01, base: 6,  growth: 1.8,  max: 10,       fmt: 'shiny',  desc: 'shiny chance when hatching/fusing' },
+    { id: 'nest',     icon: '💰', name: 'Nest Egg',            per: 0.05, base: 6,  growth: 2.0,  max: 8,        fmt: 'keep',   desc: 'of your coins kept through prestige' },
+    { id: 'compound', icon: '🌠', name: 'Stardust Compounder', per: 0.15, base: 10, growth: 1.9,  max: 12,       fmt: 'sd',     desc: 'Stardust earned on prestige' }
+  ];
+
+  // Lifetime-coin milestones: each grants a one-time Stardust reward, giving
+  // coins a destination even between prestiges.
+  const COIN_MILESTONES = [
+    { amt: 1e6, sd: 4 }, { amt: 1e7, sd: 10 }, { amt: 1e8, sd: 25 }, { amt: 1e9, sd: 60 },
+    { amt: 1e10, sd: 150 }, { amt: 1e11, sd: 380 }, { amt: 1e12, sd: 900 }, { amt: 1e13, sd: 2200 },
+    { amt: 1e14, sd: 5500 }, { amt: 1e15, sd: 14000 }, { amt: 1e16, sd: 35000 }, { amt: 1e18, sd: 90000 }
+  ];
+
   G.data = {
     RARITIES: RARITIES,
     rarity: rarity,
     ELEMENTS: ELEMENTS,
     PRESTIGE_MAX_TIER: PRESTIGE_MAX_TIER,
     MODIFIERS: MODIFIERS,
+    STARDUST_UPGRADES: STARDUST_UPGRADES,
+    COIN_MILESTONES: COIN_MILESTONES,
     modifier: modifier,
     modMult: modMult,
     rollModifierId: rollModifierId,
