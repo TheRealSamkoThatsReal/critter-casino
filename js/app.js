@@ -253,17 +253,27 @@
       const sa = G.state.getSpecies(a.item.sid) || {}, sb = G.state.getSpecies(b.item.sid) || {};
       return (sb.tier - sa.tier) || (b.item.shiny - a.item.shiny) || (sa.name || '').localeCompare(sb.name || '');
     });
-    const node = el('div', {});
-    node.appendChild(el('div', { class: 'reveal-head', text: 'Hatched ×' + results.length + '!' }));
+    const node = el('div', { class: 'summary' });
+    const canvas = el('canvas', { class: 'fx-rays' });
+    node.appendChild(canvas);
+    const content = el('div', { class: 'summary-content' });
+    content.appendChild(el('div', { class: 'reveal-head', text: 'Hatched ×' + results.length + '!' }));
     const grid = el('div', { class: 'grid pick-grid' });
-    arr.forEach(function (g) {
-      grid.appendChild(G.ui.card(g.item, { size: 56, showValue: false, badge: g.count > 1 ? ('×' + g.count) : null }));
+    arr.forEach(function (g, i) {
+      const card = G.ui.card(g.item, { size: 56, showValue: false, badge: g.count > 1 ? ('×' + g.count) : null });
+      card.classList.add('pop-in');
+      card.style.animationDelay = Math.min(i * 0.04, 1.5) + 's'; // sequential cascade, rarest first
+      grid.appendChild(card);
     });
-    node.appendChild(grid);
-    const m = G.ui.modal('', node);
-    node.appendChild(el('div', { class: 'gaction' }, [
+    content.appendChild(grid);
+    node.appendChild(content);
+
+    let stopRays = function () {};
+    const m = G.ui.modal('', node, { onClose: function () { stopRays(); } });
+    content.appendChild(el('div', { class: 'gaction' }, [
       el('button', { class: 'btn primary', text: 'Nice!', onclick: function () { m.close(); } })
     ]));
+    if (G.fx && G.fx.rays) requestAnimationFrame(function () { stopRays = G.fx.rays(canvas, bestTier); });
   }
 
   function cdLabel(ms) {

@@ -226,6 +226,41 @@
     requestAnimationFrame(frame);
   }
 
+  // Slow rotating god-rays drawn into a canvas (sized to its parent), tinted by
+  // rarity. Returns a stop() function. Used as a backdrop (e.g. multi-hatch).
+  function rays(canvas, tier) {
+    const ctx2 = canvas.getContext('2d');
+    const col = (G.data && G.data.rarity(tier).color) || '#ffffff';
+    const n = 14 + (tier || 0) * 2;
+    let stopped = false, raf = 0;
+    function frame(ts) {
+      if (stopped) return;
+      const r = canvas.getBoundingClientRect();
+      const W = Math.max(1, r.width), H = Math.max(1, r.height), dpr = window.devicePixelRatio || 1;
+      if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
+        canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+      }
+      ctx2.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx2.clearRect(0, 0, W, H);
+      const cx = W / 2, cy = H * 0.4, len = Math.max(W, H);
+      ctx2.save(); ctx2.translate(cx, cy); ctx2.rotate(ts / 3500);
+      for (let i = 0; i < n; i++) {
+        ctx2.rotate(Math.PI * 2 / n);
+        const spread = 0.09;
+        ctx2.beginPath(); ctx2.moveTo(0, 0);
+        ctx2.lineTo(Math.cos(-spread) * len, Math.sin(-spread) * len);
+        ctx2.lineTo(Math.cos(spread) * len, Math.sin(spread) * len);
+        ctx2.closePath();
+        ctx2.globalAlpha = (i % 2 ? 0.07 : 0.13);
+        ctx2.fillStyle = col; ctx2.fill();
+      }
+      ctx2.restore();
+      raf = requestAnimationFrame(frame);
+    }
+    raf = requestAnimationFrame(frame);
+    return function () { stopped = true; if (raf) cancelAnimationFrame(raf); };
+  }
+
   // ---- public --------------------------------------------------------------
   // Celebrate getting a creature of the given rarity tier.
   function celebrate(tier) {
@@ -246,6 +281,6 @@
     window.addEventListener('touchstart', unlock, { once: true });
   }
 
-  G.fx = { celebrate: celebrate, sound: sound, burst: burst, suspense: suspense, init: init,
+  G.fx = { celebrate: celebrate, sound: sound, burst: burst, suspense: suspense, rays: rays, init: init,
     isMuted: isMuted, toggleMute: toggleMute };
 })(window.G = window.G || {});
