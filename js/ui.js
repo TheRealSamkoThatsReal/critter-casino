@@ -71,6 +71,12 @@
       c.appendChild(el('div', { class: 'cvalue', html: '✨ ' + fmt(G.state.valueOf(item)) }));
     if (opts.badge) c.appendChild(el('div', { class: 'cbadge', text: opts.badge }));
     if (opts.showNew && !opts.silhouette && G.state.isNew && G.state.isNew(item.sid)) c.appendChild(el('div', { class: 'cnew', text: 'NEW' }));
+    const mod = !opts.silhouette && G.data.modifier && G.data.modifier(item.mod);
+    if (mod) {
+      c.classList.add('has-mod');
+      c.style.setProperty('--modc', mod.color);
+      c.appendChild(el('div', { class: 'cmod', text: mod.icon, title: mod.name + ' • ×' + mod.mult + ' income' }));
+    }
     if (opts.onClick) {
       c.classList.add('clickable');
       c.addEventListener('click', function () { haptic(12); opts.onClick(item, c); });

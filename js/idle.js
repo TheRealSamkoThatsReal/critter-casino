@@ -35,6 +35,7 @@
     if (!sp) return 0;
     let v = RATE[sp.tier] * (item.shiny ? 5 : 1);
     if (sp.tier >= 2) v *= rarityMult();
+    v *= G.data.modMult(item.mod); // rare income modifier (ranch-grown)
     return v * habitatMult() * G.state.prestigeMult();
   }
   function rawIncomePerSec() {
@@ -120,6 +121,44 @@
     return died;
   }
 
+  // Per eligible (unmodified) creature, a small hourly chance to develop a rare
+  // income modifier. Rolls whole elapsed hours (works live and for offline gaps).
+  // Returns [{item, mod}] for any granted this pass.
+  const MOD_PER_HOUR = 0.0006; // ~0.06%/creature/hour — rare; ~1/week for a typical collection, scales with size
+  function processModifiers(now) {
+    const s = G.state.get();
+    const from = s.lastModRoll || now;
+    const hours = Math.floor((now - from) / 3600000);
+    if (hours <= 0) return [];
+    const loopHours = Math.min(hours, 2000); // bound the loop for very long gaps
+    s.lastModRoll = hours > 2000 ? now : from + hours * 3600000;
+    const gained = [];
+    for (let h = 0; h < loopHours; h++) {
+      for (let i = 0; i < s.inv.length; i++) {
+        const it = s.inv[i];
+        if (it.mod) continue; // one modifier per creature, no re-rolls
+        if (Math.random() < MOD_PER_HOUR) {
+          it.mod = G.data.rollModifierId();
+          gained.push({ item: it, mod: it.mod });
+        }
+      }
+    }
+    if (gained.length) G.state.save();
+    return gained;
+  }
+
+  // celebratory toast(s) when creatures develop a modifier
+  function announceModifiers(gained) {
+    if (!gained || !gained.length) return;
+    gained.slice(0, 3).forEach(function (g) {
+      const m = G.data.modifier(g.mod), sp = G.state.getSpecies(g.item.sid);
+      if (!m || !sp) return;
+      toast(m.icon + ' ' + sp.name + ' became ' + m.name + '! ×' + m.mult + ' income', 'good');
+    });
+    if (gained.length > 3) toast('✦ ' + (gained.length - 3) + ' more creatures gained modifiers!', 'good');
+    G.ui.haptic([15, 30, 15, 30, 60]);
+  }
+
   // ---- offline / ticking ---------------------------------------------------
   function collectOffline() {
     const s = G.state.get();
@@ -138,8 +177,9 @@
     if (earned > 0) s.coins += earned;
     s.lastTick = now;
     const died = processStarvation(now); // also saves if any died
+    const mods = processModifiers(now);  // also saves if any granted
     G.state.save();
-    return { earned: earned, elapsed: elapsed, capped: Math.min(elapsed, offlineCapSec()), died: died };
+    return { earned: earned, elapsed: elapsed, capped: Math.min(elapsed, offlineCapSec()), died: died, mods: mods };
   }
 
   let iv = null, ticks = 0;
@@ -148,6 +188,7 @@
     const inc = incomePerSec(); // 0 when hungry/starving
     if (inc > 0) s.coins += inc; // one second's worth
     processStarvation(Date.now()); // acts only when a whole starving hour elapses
+    announceModifiers(processModifiers(Date.now())); // rare modifier grants (acts hourly)
     ticks++;
     if (ticks % 10 === 0) { s.lastTick = Date.now(); G.state.save(); }
     updateLive();
@@ -213,6 +254,14 @@
     if (res.died > 0) {
       node.appendChild(el('div', { class: 'gresult bad', text:
         '💀 ' + res.died + ' creature' + (res.died > 1 ? 's' : '') + ' starved while you were away!' }));
+    }
+    if (res.mods && res.mods.length) {
+      res.mods.slice(0, 4).forEach(function (g) {
+        const md = G.data.modifier(g.mod), sp = G.state.getSpecies(g.item.sid);
+        if (md && sp) node.appendChild(el('div', { class: 'gresult good', text:
+          md.icon + ' ' + sp.name + ' became ' + md.name + '! ×' + md.mult + ' income' }));
+      });
+      if (res.mods.length > 4) node.appendChild(el('div', { class: 'gsub', text: '…and ' + (res.mods.length - 4) + ' more gained modifiers.' }));
     }
     const st = fedState();
     if (st !== 'fed') {
@@ -425,7 +474,7 @@
 
   // ---- init ----------------------------------------------------------------
   function shouldModal(res) {
-    return res && ((res.earned >= 1 && res.elapsed > 60) || res.died > 0);
+    return res && ((res.earned >= 1 && res.elapsed > 60) || res.died > 0 || (res.mods && res.mods.length));
   }
   function init() {
     const res = collectOffline();

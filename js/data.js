@@ -90,11 +90,38 @@
     return list;
   }
 
+  // Income modifiers — rare traits a creature can spontaneously develop while
+  // generating income at the Ranch. They multiply that creature's coin output.
+  // Deliberately NOT obtainable from eggs, casino, or fusion (ranch-grown only).
+  // `weight` is the relative chance of each modifier *given* that one is granted.
+  const MODIFIERS = [
+    { id: 'gilded',    name: 'Gilded',    icon: '✦', mult: 1.5, color: '#ffd75e', weight: 64 },
+    { id: 'radiant',   name: 'Radiant',   icon: '✸', mult: 2,   color: '#5ec8ff', weight: 25 },
+    { id: 'mythic',    name: 'Mythical',  icon: '❂', mult: 3,   color: '#c46bff', weight: 9  },
+    { id: 'ascendant', name: 'Ascendant', icon: '👑', mult: 5,   color: '#ff5ea8', weight: 2  }
+  ];
+  const MOD_BY_ID = {};
+  MODIFIERS.forEach(function (m) { MOD_BY_ID[m.id] = m; });
+  function modifier(id) { return id ? (MOD_BY_ID[id] || null) : null; }
+  function modMult(id) { const m = modifier(id); return m ? m.mult : 1; }
+  // weighted pick of a modifier id (caller decides *whether* to grant one)
+  function rollModifierId() {
+    let total = 0;
+    MODIFIERS.forEach(function (m) { total += m.weight; });
+    let r = Math.random() * total;
+    for (let i = 0; i < MODIFIERS.length; i++) { r -= MODIFIERS[i].weight; if (r <= 0) return MODIFIERS[i].id; }
+    return MODIFIERS[0].id;
+  }
+
   G.data = {
     RARITIES: RARITIES,
     rarity: rarity,
     ELEMENTS: ELEMENTS,
     PRESTIGE_MAX_TIER: PRESTIGE_MAX_TIER,
+    MODIFIERS: MODIFIERS,
+    modifier: modifier,
+    modMult: modMult,
+    rollModifierId: rollModifierId,
     builtinRoster: buildRoster()
   };
 })(window.G = window.G || {});

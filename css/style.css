@@ -146,6 +146,13 @@ body {
   box-shadow: 0 1px 4px rgba(0,0,0,.45); animation: cnew-pop .25s ease-out; }
 .card.selected .cnew { display: none; }
 @keyframes cnew-pop { from { transform: scale(0); } to { transform: scale(1); } }
+/* income modifier (ranch-grown trait) */
+.card.has-mod { border-color: var(--modc); box-shadow: 0 0 10px -1px var(--modc), inset 0 0 8px -3px var(--modc); }
+.card .cmod { position: absolute; top: 3px; left: 3px; z-index: 5;
+  width: 17px; height: 17px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; line-height: 1; background: rgba(8,12,20,.82); color: var(--modc);
+  border: 1px solid var(--modc); box-shadow: 0 0 6px -1px var(--modc); }
+.pill.mod-pill { color: var(--modc); border-color: var(--modc); background: color-mix(in srgb, var(--modc) 14%, transparent); font-weight: 800; }
 .card.shiny { box-shadow: inset 0 0 18px rgba(255,225,77,.25); }
 .card.shiny .spritebox::after { content: ""; position: absolute; inset: -4px; border-radius: 50%;
   background: radial-gradient(circle, rgba(255,225,120,.35), transparent 70%); pointer-events: none; }

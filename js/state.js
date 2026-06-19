@@ -13,6 +13,7 @@
     lastTick: 0,        // timestamp of last income settle (for offline earnings)
     lastFed: 0,         // timestamp creatures were last fed (hunger/starvation)
     lastDeathRoll: 0,   // high-water mark for hourly starvation death rolls
+    lastModRoll: 0,     // high-water mark for hourly income-modifier rolls
     discovered: {},     // Critterdex: every species id ever owned (persists across sell/gamble)
     newSpecies: {},     // species discovered but not yet viewed (shows a NEW badge)
     prestige: 0,        // number of times prestiged (permanent income multiplier)
@@ -38,6 +39,8 @@
       (s.inv || []).forEach(function (it) { s.discovered[it.sid] = 1; });
       // existing players start well-fed so this update doesn't starve them
       if (!s.lastFed) s.lastFed = Date.now();
+      // start the modifier clock now so existing saves don't get a retroactive burst
+      if (!s.lastModRoll) s.lastModRoll = Date.now();
       if (!s.adminPass) s.adminPass = 'admin';
       return s;
     } catch (e) {
@@ -49,6 +52,7 @@
     s.player.id = genId();
     s.discovered = s.discovered || {};
     s.lastFed = Date.now();
+    s.lastModRoll = Date.now();
     // starter creatures so a new player has something to play with
     STARTERS.forEach(function (sid) {
       s.inv.push(mkInstance(sid));
@@ -213,6 +217,7 @@
     state.discovered = {};
     state.newSpecies = {};
     state.lastTick = Date.now();
+    state.lastModRoll = Date.now();
     state.lastFed = Date.now();
     state.lastDeathRoll = 0;
     STARTERS.forEach(function (sid) { state.inv.push(mkInstance(sid)); state.discovered[sid] = 1; });

@@ -35,9 +35,11 @@
     big.appendChild(G.sprites.el(sp, 150));
     node.appendChild(big);
     node.appendChild(el('div', { class: 'detail-name', text: (item.shiny ? '✨ ' : '') + sp.name }));
+    const mod = G.data.modifier(item.mod);
     node.appendChild(el('div', { class: 'detail-meta', html:
       '<span class="pill r' + sp.tier + '">' + r.name + '</span> ' +
       '<span class="pill">' + sp.element + '</span> ' +
+      (mod ? '<span class="pill mod-pill" style="--modc:' + mod.color + '">' + mod.icon + ' ' + mod.name + ' ×' + mod.mult + '</span> ' : '') +
       '<span class="pill">✨ ' + fmt(G.state.valueOf(item)) + '</span> ' +
       '<span class="pill">📈 ⛁ ' + G.idle.fmtRate(G.idle.creatureIncome(item)) + '/s</span>' }));
     const m = G.ui.modal(sp.name, node);

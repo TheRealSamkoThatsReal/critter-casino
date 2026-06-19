@@ -48,6 +48,13 @@ with **no backend required**, hosted on GitHub Pages.
   based on rarity, even while the app is closed (offline earnings, capped).
   Spend coins on upgrades (Habitat, Gilded Cages, Cozy Beds) to earn faster.
   This gives a reason to *hold* creatures rather than sell or wager them all.
+- **Income modifiers** — rare traits a creature can spontaneously develop *while
+  generating income at the Ranch*: **Gilded ×1.5 → Radiant ×2 → Mythical ×3 →
+  Ascendant ×5** coin output (rarer tiers are stronger). They're deliberately
+  **impossible to get from eggs, the casino, or fusion** — only the Ranch grows
+  them, slowly, so they feel earned. You're told when one appears (a toast, or in
+  the welcome-back screen if it happened offline), and a modified creature shows a
+  coloured corner gem and aura on its card.
 - **Prestige** — a persistent **Critterdex** tracks every species you've ever
   owned. Discover all currently-unlocked creatures and you can prestige: your run
   (creatures, coins, Ranch upgrades, dex) resets in exchange for a **permanent
