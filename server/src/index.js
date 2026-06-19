@@ -101,7 +101,7 @@ export class TradeBoard extends DurableObject {
     const oid = tid();
     this.sql.exec('INSERT INTO offers (offer_id,listing_id,bidder_id,bidder_name,give,status,payout,collected,created) VALUES (?,?,?,?,?,?,?,?,?)',
       oid, L.id, b.id, b.name, JSON.stringify(g), 'pending', null, 0, Date.now());
-    return { ok: true, offerId: oid };
+    return { ok: true, offerId: oid, notifyOwner: L.owner_id }; // ping the listing owner
   }
   myListings(ownerId) {
     const rows = this.sql.exec("SELECT * FROM listings WHERE owner_id=? AND status='open' ORDER BY created DESC", String(ownerId || '')).toArray();
@@ -130,10 +130,11 @@ export class TradeBoard extends DurableObject {
     if (L.status !== 'open') return { error: 'closed' };
     const O = this.sql.exec('SELECT * FROM offers WHERE offer_id=? AND listing_id=?', String(offerId || ''), L.id).toArray()[0];
     if (!O || O.status !== 'pending') return { error: 'offer gone' };
+    const declined = this.sql.exec("SELECT DISTINCT bidder_id FROM offers WHERE listing_id=? AND status='pending' AND offer_id!=?", L.id, O.offer_id).toArray().map(function (r) { return r.bidder_id; });
     this.sql.exec("UPDATE offers SET status='accepted', payout=? WHERE offer_id=?", L.give, O.offer_id); // winner collects the listing
     this.sql.exec("UPDATE offers SET status='declined', payout=give WHERE listing_id=? AND status='pending'", L.id); // others refunded
     this.sql.exec("UPDATE listings SET status='completed' WHERE id=?", L.id);
-    return { ok: true, ownerGets: JSON.parse(O.give) }; // owner receives the accepted bidder's creatures now
+    return { ok: true, ownerGets: JSON.parse(O.give), notifyWinner: O.bidder_id, notifyDeclined: declined };
   }
   decline(listingId, ownerId, offerId) {
     const L = this._listing(listingId);
@@ -141,15 +142,16 @@ export class TradeBoard extends DurableObject {
     const O = this.sql.exec('SELECT * FROM offers WHERE offer_id=? AND listing_id=?', String(offerId || ''), L.id).toArray()[0];
     if (!O || O.status !== 'pending') return { error: 'offer gone' };
     this.sql.exec("UPDATE offers SET status='declined', payout=give WHERE offer_id=?", O.offer_id);
-    return { ok: true };
+    return { ok: true, notifyDeclined: [O.bidder_id] };
   }
   cancel(listingId, ownerId) {
     const L = this._listing(listingId);
     if (!L || L.owner_id !== String(ownerId || '')) return { error: 'not owner' };
     if (L.status !== 'open') return { error: 'closed' };
+    const declined = this.sql.exec("SELECT DISTINCT bidder_id FROM offers WHERE listing_id=? AND status='pending'", L.id).toArray().map(function (r) { return r.bidder_id; });
     this.sql.exec("UPDATE offers SET status='declined', payout=give WHERE listing_id=? AND status='pending'", L.id);
     this.sql.exec("UPDATE listings SET status='cancelled' WHERE id=?", L.id);
-    return { ok: true, give: JSON.parse(L.give) };
+    return { ok: true, give: JSON.parse(L.give), notifyDeclined: declined };
   }
   withdraw(offerId, bidderId) {
     const O = this._offer(offerId);
@@ -168,8 +170,23 @@ export class TradeBoard extends DurableObject {
 }
 function board(env) { return env.TRADE.get(env.TRADE.idFromName('board')); }
 
+// push a notification to every subscription registered for a player id
+async function sendToPlayer(env, pid, body, title) {
+  if (!pid) return;
+  let keys = [];
+  try { keys = JSON.parse(await env.SUBS.get('pid:' + pid) || '[]'); } catch (e) {}
+  for (const k of keys) {
+    const raw = await env.SUBS.get(k);
+    if (!raw) continue;
+    try {
+      const res = await sendPush(JSON.parse(raw), { title: title || 'Critter Casino 🤝', body: body, url: './' }, env);
+      if (res.status === 404 || res.status === 410) await env.SUBS.delete(k);
+    } catch (e) {}
+  }
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     const url = new URL(request.url);
 
@@ -193,7 +210,14 @@ export default {
       rec.tz = (typeof b.tz === 'number') ? b.tz : 0;
       rec.active = b.active || localDayStr(rec.tz); // last day the player was active
       if (typeof b.lastFed === 'number' && b.lastFed > 0) rec.lastFed = b.lastFed; // for feed reminders
+      if (b.pid) rec.pid = String(b.pid).slice(0, 40);
       await env.SUBS.put(k, JSON.stringify(rec));
+      // index player id -> sub key(s) so trade events can push to a player
+      if (rec.pid) {
+        const ik = 'pid:' + rec.pid;
+        let arr = []; try { arr = JSON.parse(await env.SUBS.get(ik) || '[]'); } catch (e) {}
+        if (arr.indexOf(k) === -1) { arr.push(k); await env.SUBS.put(ik, JSON.stringify(arr)); }
+      }
       return json({ ok: true });
     }
 
@@ -229,12 +253,32 @@ export default {
       let b;
       try { b = await request.json(); } catch (e) { return json({ error: 'bad json' }, 400); }
       const bd = board(env);
+      const notify = function (pid, msg) { if (ctx && pid) ctx.waitUntil(sendToPlayer(env, pid, msg)); };
       switch (url.pathname.slice('/trade/'.length)) {
         case 'post': return json(await bd.post(b.owner, b.give, b.want));
-        case 'offer': return json(await bd.offer(b.listingId, b.bidder, b.give));
-        case 'accept': return json(await bd.accept(b.listingId, b.ownerId, b.offerId));
-        case 'decline': return json(await bd.decline(b.listingId, b.ownerId, b.offerId));
-        case 'cancel': return json(await bd.cancel(b.listingId, b.ownerId));
+        case 'offer': {
+          const r = await bd.offer(b.listingId, b.bidder, b.give);
+          if (r.ok) notify(r.notifyOwner, ((b.bidder && b.bidder.name) || 'Someone') + ' made an offer on your listing! 📨');
+          delete r.notifyOwner; return json(r);
+        }
+        case 'accept': {
+          const r = await bd.accept(b.listingId, b.ownerId, b.offerId);
+          if (r.ok) {
+            notify(r.notifyWinner, 'Your offer was accepted! 🎉 Collect it in My Offers.');
+            (r.notifyDeclined || []).forEach(function (id) { notify(id, 'An offer was declined — reclaim your creatures in My Offers.'); });
+          }
+          delete r.notifyWinner; delete r.notifyDeclined; return json(r);
+        }
+        case 'decline': {
+          const r = await bd.decline(b.listingId, b.ownerId, b.offerId);
+          if (r.ok) (r.notifyDeclined || []).forEach(function (id) { notify(id, 'Your offer was declined — reclaim your creatures in My Offers.'); });
+          delete r.notifyDeclined; return json(r);
+        }
+        case 'cancel': {
+          const r = await bd.cancel(b.listingId, b.ownerId);
+          if (r.ok) (r.notifyDeclined || []).forEach(function (id) { notify(id, 'A listing you offered on was cancelled — reclaim your creatures.'); });
+          delete r.notifyDeclined; return json(r);
+        }
         case 'withdraw': return json(await bd.withdraw(b.offerId, b.bidderId));
         case 'collect': return json(await bd.collect(b.offerId, b.bidderId));
         case 'mine-listings': return json(await bd.myListings(b.ownerId));

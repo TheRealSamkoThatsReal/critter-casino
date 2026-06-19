@@ -68,7 +68,9 @@ with **no backend required**, hosted on GitHub Pages.
     **accept or decline**. On accept you get the bidder's creatures, the winner
     collects your listing, and rejected bidders get their creatures back — all
     atomic and dupe-proof via a Cloudflare Durable Object. Includes My Listings
-    (review/accept offers, cancel) and My Offers (withdraw / collect).
+    (review/accept offers, cancel) and My Offers (withdraw / collect). With
+    reminders enabled you get a **push when someone offers on your listing**, and
+    when your offer is **accepted or declined**.
   - **Offline code trade**: compact shareable codes that need no server — but,
     being client-only, are honor-based (a code can be redeemed by multiple
     people).

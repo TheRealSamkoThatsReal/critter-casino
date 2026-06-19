@@ -56,7 +56,8 @@
         hour: getHour(),
         tz: -new Date().getTimezoneOffset(), // minutes east of UTC
         active: localDay(),
-        lastFed: (G.state && G.state.get().lastFed) || 0 // for feed reminders
+        lastFed: (G.state && G.state.get().lastFed) || 0, // for feed reminders
+        pid: (G.state && G.state.get().player.id) || '' // map player -> sub for trade pushes
       })
     });
   }
