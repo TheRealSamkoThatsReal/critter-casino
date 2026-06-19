@@ -19,9 +19,8 @@
   }
 
   // Resolve a wager with a payout multiplier (0 = total loss). On a win the
-  // payout VALUE (stake*mult, divided by the prestige cost scale) is paid out as
-  // a set of creatures whose combined value matches it — so you actually receive
-  // roughly what the payout says, not one floored-down creature.
+  // payout VALUE (stake*mult) is paid out as a set of creatures whose combined
+  // value matches it — so you actually receive what the payout says.
   function resolve(wager, mult) {
     const stake = stakeOf(wager);
     wager.forEach(function (it) { G.state.removeInstance(it.iid); });
@@ -31,7 +30,7 @@
       G.state.save();
       return { lost: true, count: wager.length, stake: stake };
     }
-    let budget = Math.round(stake * mult / G.state.progressScale());
+    let budget = Math.round(stake * mult); // no prestige tax on casino winnings
     if (Math.random() < 0.07) budget = Math.round(budget * 1.5); // lucky crit bonus
     const cap = G.state.maxTierUnlocked(); // rarities above are prestige-locked
     const items = [];
