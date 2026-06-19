@@ -85,7 +85,8 @@
       if (!startTs) startTs = ts;
       const p = Math.min(1, (ts - startTs) / DUR);
       fill.style.width = (p * 100) + '%';
-      if (ts - lastTick > 160) { lastTick = ts; G.ui.haptic(5); }
+      // building rumble: pulses get stronger and more frequent toward the end
+      if (ts - lastTick > (220 - p * 130)) { lastTick = ts; G.ui.haptic(Math.round(12 + p * 35)); }
       if (p >= 1) { reset(); onComplete(); return; }
       raf = requestAnimationFrame(frame);
     }

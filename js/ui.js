@@ -72,7 +72,7 @@
     if (opts.badge) c.appendChild(el('div', { class: 'cbadge', text: opts.badge }));
     if (opts.onClick) {
       c.classList.add('clickable');
-      c.addEventListener('click', function () { haptic(8); opts.onClick(item, c); });
+      c.addEventListener('click', function () { haptic(12); opts.onClick(item, c); });
     }
     return c;
   }
