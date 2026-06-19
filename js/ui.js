@@ -68,7 +68,7 @@
     c.appendChild(el('div', { class: 'cname', text: opts.silhouette ? (opts.nameOverride || '???') : sp.name }));
     c.appendChild(el('div', { class: 'crarity', text: r.name }));
     if (opts.showValue !== false && !opts.silhouette)
-      c.appendChild(el('div', { class: 'cvalue', html: '⛁ ' + fmt(G.state.valueOf(item)) }));
+      c.appendChild(el('div', { class: 'cvalue', html: '✨ ' + fmt(G.state.valueOf(item)) }));
     if (opts.badge) c.appendChild(el('div', { class: 'cbadge', text: opts.badge }));
     if (opts.onClick) {
       c.classList.add('clickable');
@@ -123,7 +123,7 @@
       big.appendChild(G.sprites.el(sp, 140));
       node.appendChild(big);
       node.appendChild(el('div', { class: 'reveal-name', text: (item.shiny ? '✨ Shiny ' : '') + sp.name }));
-      node.appendChild(el('div', { class: 'reveal-rarity', text: r.name + ' • ⛁ ' + fmt(G.state.valueOf(item)) }));
+      node.appendChild(el('div', { class: 'reveal-rarity', text: r.name + ' • ✨ ' + fmt(G.state.valueOf(item)) }));
       if (G.fx) G.fx.celebrate(sp.tier);
       return modal('', node);
     }

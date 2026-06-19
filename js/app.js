@@ -38,7 +38,7 @@
     node.appendChild(el('div', { class: 'detail-meta', html:
       '<span class="pill r' + sp.tier + '">' + r.name + '</span> ' +
       '<span class="pill">' + sp.element + '</span> ' +
-      '<span class="pill">⛁ ' + fmt(G.state.valueOf(item)) + '</span> ' +
+      '<span class="pill">✨ ' + fmt(G.state.valueOf(item)) + '</span> ' +
       '<span class="pill">📈 ⛁ ' + G.idle.fmtRate(G.idle.creatureIncome(item)) + '/s</span>' }));
     const m = G.ui.modal(sp.name, node);
     node.appendChild(el('div', { class: 'gaction' }, [
@@ -76,7 +76,7 @@
     node.appendChild(el('div', { class: 'detail-meta', html:
       '<span class="pill r' + sp.tier + '">' + r.name + '</span> ' +
       '<span class="pill">' + sp.element + '</span> ' +
-      '<span class="pill">⛁ ' + fmt(r.value) + '</span>' }));
+      '<span class="pill">✨ ' + fmt(r.value) + '</span>' }));
     const owned = G.state.get().inv.filter(function (it) { return it.sid === sp.id; }).length;
     node.appendChild(el('div', { class: 'gsub', text: owned ? ('You own ' + owned) : 'Discovered — not currently owned' }));
     G.ui.modal(sp.name, node);
@@ -126,7 +126,7 @@
       const uniq = {}; s.inv.forEach(function (it) { uniq[it.sid] = 1; });
       container.appendChild(el('div', { class: 'coll-stats' }, [
         stat(String(s.inv.length), 'creatures'),
-        stat('⛁ ' + fmt(collectionValue()), 'total value'),
+        stat('✨ ' + fmt(collectionValue()), 'total value'),
         stat(Object.keys(uniq).length + '/' + G.state.allSpecies().length, 'species')
       ]));
     } else {

@@ -77,9 +77,9 @@
     function update() {
       const items = Object.keys(selected).map(function (k) { return selected[k]; });
       const total = stakeOf(items);
-      info.innerHTML = 'Wagering <b>' + items.length + '</b> · stake <b>⛁ ' + fmt(total) + '</b>';
+      info.innerHTML = 'Wagering <b>' + items.length + '</b> · stake <b>✨ ' + fmt(total) + '</b>';
       goBtn.disabled = !items.length;
-      goBtn.textContent = items.length ? ('Wager ⛁ ' + fmt(total)) : 'Select creatures';
+      goBtn.textContent = items.length ? ('Wager ✨ ' + fmt(total)) : 'Select creatures';
     }
     const tools = el('div', { class: 'wager-tools' }, [
       el('button', { class: 'btn small', text: '+5 cheapest', onclick: function () { addCheapest(5); } }),
@@ -107,7 +107,7 @@
       G.ui.haptic(res.lost ? 180 : [25, 40, 30, 40, 80]);
       if (res.lost) {
         container.appendChild(el('div', { class: 'gresult bad', html:
-          '💀 Lost! Your wager of ' + res.count + ' creature' + (res.count > 1 ? 's' : '') + ' (⛁ ' + fmt(res.stake) + ') is gone.' }));
+          '💀 Lost! Your wager of ' + res.count + ' creature' + (res.count > 1 ? 's' : '') + ' (✨ ' + fmt(res.stake) + ') is gone.' }));
       } else {
         const sp = G.state.getSpecies(res.item.sid);
         const r = G.data.rarity(sp.tier);
@@ -116,7 +116,7 @@
           '🎉 ×' + res.mult + ' → won a <b>' + r.name + '</b>!' }));
         container.appendChild(G.ui.card(res.item, { size: 84 }));
         container.appendChild(el('div', { class: 'gsub', html:
-          'Staked ⛁ ' + fmt(res.stake) + ' → payout ⛁ ' + fmt(res.target) }));
+          'Staked ✨ ' + fmt(res.stake) + ' → payout ✨ ' + fmt(res.target) }));
       }
       container.appendChild(el('button', { class: 'btn primary', text: 'Play again', onclick: onAgain }));
       if (window.refreshAll) window.refreshAll();
@@ -142,7 +142,7 @@
     const stake = stakeOf(wager);
     const wrap = el('div', { class: 'game coinflip' });
     wrap.appendChild(el('p', { class: 'gdesc', html:
-      'Heads <b>doubles</b> your ⛁ ' + fmt(stake) + ' stake into a new creature. Tails and it\'s all lost. 50/50.' }));
+      'Heads <b>doubles</b> your ✨ ' + fmt(stake) + ' stake into a new creature. Tails and it\'s all lost. 50/50.' }));
     const stage = el('div', { class: 'gstage' });
     const coin = el('div', { class: 'coin' }, [
       el('div', { class: 'coin-face heads', text: '⛀' }),
@@ -183,7 +183,7 @@
     const stake = stakeOf(wager);
     const wrap = el('div', { class: 'game wheelgame' });
     wrap.appendChild(el('p', { class: 'gdesc', html:
-      'Spin to multiply your ⛁ ' + fmt(stake) + ' stake. Land JACKPOT for a ×10 payout!' }));
+      'Spin to multiply your ✨ ' + fmt(stake) + ' stake. Land JACKPOT for a ×10 payout!' }));
     const stage = el('div', { class: 'gstage' });
     const wheel = el('div', { class: 'wheel' });
     let total = WHEEL.reduce(function (a, s) { return a + s.w; }, 0);
@@ -237,7 +237,7 @@
     const stake = stakeOf(wager);
     const wrap = el('div', { class: 'game slots' });
     wrap.appendChild(el('p', { class: 'gdesc', html:
-      'Spin your ⛁ ' + fmt(stake) + ' stake. ⭐⭐⭐ pays ×8, any three ×3, two matching ×1.5, all different loses.' }));
+      'Spin your ✨ ' + fmt(stake) + ' stake. ⭐⭐⭐ pays ×8, any three ×3, two matching ×1.5, all different loses.' }));
     const reels = el('div', { class: 'reels' });
     const cells = [];
     for (let i = 0; i < 3; i++) { const c = el('div', { class: 'reel', text: '❔' }); cells.push(c); reels.appendChild(c); }
@@ -285,7 +285,7 @@
     const stake = stakeOf(wager);
     const wrap = el('div', { class: 'game dice' });
     wrap.appendChild(el('p', { class: 'gdesc', html:
-      'Roll two dice with your ⛁ ' + fmt(stake) + ' stake. <b>12</b>: ×4. <b>10-11</b>: ×2.5. ' +
+      'Roll two dice with your ✨ ' + fmt(stake) + ' stake. <b>12</b>: ×4. <b>10-11</b>: ×2.5. ' +
       '<b>7-9</b>: ×1.5. <b>2-6</b>: lost.' }));
     const stage = el('div', { class: 'gstage dicestage' });
     const d1 = el('div', { class: 'die', text: '⚀' });

@@ -126,7 +126,7 @@
       preview.appendChild(G.sprites.el(sp, 110));
       const r = G.data.rarity(draft.tier);
       preview.appendChild(el('div', { class: 'admin-prev-info', html:
-        '<b>' + (draft.name || 'Unnamed') + '</b><br>' + draft.element + ' • ' + r.name + ' • ⛁ ' + r.value +
+        '<b>' + (draft.name || 'Unnamed') + '</b><br>' + draft.element + ' • ' + r.name + ' • ✨ ' + r.value +
         (draft.pixels ? '<br><span class="custom-tag">✏️ custom sprite</span>' : '') }));
     }
     const nameInp = el('input', { class: 'a-input', placeholder: 'Creature name' });
@@ -138,7 +138,7 @@
 
     const tierSel = el('select', { class: 'a-input' });
     G.data.RARITIES.forEach(function (r) {
-      tierSel.appendChild(el('option', { value: r.tier, text: r.name + ' (⛁' + r.value + ')' }));
+      tierSel.appendChild(el('option', { value: r.tier, text: r.name + ' (✨' + r.value + ')' }));
     });
     tierSel.addEventListener('change', function () { draft.tier = parseInt(tierSel.value, 10); redraw(); });
 
