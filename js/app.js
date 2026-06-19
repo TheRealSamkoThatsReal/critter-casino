@@ -396,10 +396,9 @@
     node.appendChild(content);
 
     let stopRays = function () {};
-    const m = G.ui.modal('', node, { onClose: function () { stopRays(); } });
-    content.appendChild(el('div', { class: 'gaction' }, [
-      el('button', { class: 'btn primary', text: 'Nice!', onclick: function () { m.close(); } })
-    ]));
+    const niceBtn = el('button', { class: 'btn primary', text: 'Nice!' });
+    const m = G.ui.modal('', node, { footer: niceBtn, onClose: function () { stopRays(); } });
+    niceBtn.addEventListener('click', function () { m.close(); });
     if (G.fx && G.fx.rays) requestAnimationFrame(function () { stopRays = G.fx.rays(canvas, bestTier); });
   }
 
