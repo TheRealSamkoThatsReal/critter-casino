@@ -272,6 +272,10 @@
     refreshAll();
   }
 
+  // cost to guarantee a shiny fusion result = result-tier base value x this.
+  // Shiny gives 5x value AND 5x income forever, so this is a steep premium.
+  const SHINY_FUSE_MULT = 40;
+
   // ---- fusion: 3 of a rarity -> 1 of the next (shrinks the collection) -----
   function fuseRarityOptions() {
     const s = G.state.get(), cap = G.state.maxTierUnlocked(), counts = {};
@@ -303,7 +307,7 @@
     const m = G.ui.modal('🔥 Fuse', wrap, { footer: goBtn });
     let tier = opts[0], selected = {}, cardByIid = {};
 
-    function shinyCost() { return G.data.rarity(tier + 1).value * 4; }
+    function shinyCost() { return G.data.rarity(tier + 1).value * SHINY_FUSE_MULT; }
     function update() {
       const n = Object.keys(selected).length, groups = Math.floor(n / 3);
       const sc = shinyCost(), totalSc = forceShiny ? sc * groups : 0;
