@@ -406,7 +406,7 @@
     return s + 's';
   }
   // ---- black market: buy a guaranteed undiscovered creature (coins -> dex) --
-  const BM_BASE = 2500, BM_GROWTH = 1.8;
+  const BM_BASE = 25000, BM_GROWTH = 2.5;
   function bmPrice() {
     return Math.round(BM_BASE * G.state.progressScale() * Math.pow(BM_GROWTH, G.state.get().bmBuys || 0));
   }
