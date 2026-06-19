@@ -406,7 +406,7 @@
     return s + 's';
   }
   // ---- black market: buy a guaranteed undiscovered creature (coins -> dex) --
-  const BM_BASE = 25000, BM_GROWTH = 2.5;
+  const BM_BASE = 25000, BM_GROWTH = 2.5, BM_MAX_BUYS = 5; // cap purchases per prestige run
   function bmPrice() {
     return Math.round(BM_BASE * G.state.progressScale() * Math.pow(BM_GROWTH, G.state.get().bmBuys || 0));
   }
@@ -416,6 +416,7 @@
   }
   function buyBlackMarket(container) {
     const s = G.state.get();
+    if ((s.bmBuys || 0) >= BM_MAX_BUYS) { toast('Black market is sold out until you prestige.', ''); return; }
     const pool = bmUndiscovered();
     if (!pool.length) { toast('Every unlocked creature is already discovered!', ''); return; }
     const price = bmPrice();
@@ -433,17 +434,21 @@
   }
   function blackMarketPanel(container) {
     const s = G.state.get(), pool = bmUndiscovered(), price = bmPrice();
+    const left = BM_MAX_BUYS - (s.bmBuys || 0);
     const panel = el('div', { class: 'panel bm-panel' }, [el('h3', { text: '🕵️ Black Market' })]);
     panel.appendChild(el('p', { class: 'gdesc', text:
-      'Buy a creature you haven\'t discovered yet — progress straight toward your next prestige. Price rises with each purchase this run.' }));
+      'Buy a creature you haven\'t discovered yet — progress toward your next prestige. Price rises sharply with each purchase, and stock is limited per run.' }));
     if (!pool.length) {
       panel.appendChild(el('div', { class: 'gsub', text: '✅ You\'ve discovered every unlocked creature. Prestige to unlock more.' }));
+    } else if (left <= 0) {
+      panel.appendChild(el('div', { class: 'gsub', text: '🚫 Sold out for this run — prestige to restock the black market.' }));
     } else {
       const b = el('button', { class: 'btn primary', html: '🛒 Buy undiscovered — ⛁ ' + fmt(price) });
       b.disabled = s.coins < price;
       b.addEventListener('click', function () { buyBlackMarket(container); });
       panel.appendChild(b);
-      panel.appendChild(el('div', { class: 'gsub', text: pool.length + ' undiscovered creature' + (pool.length !== 1 ? 's' : '') + ' remaining at your tier.' }));
+      panel.appendChild(el('div', { class: 'gsub', text:
+        left + ' purchase' + (left !== 1 ? 's' : '') + ' left this run · ' + pool.length + ' undiscovered at your tier.' }));
     }
     container.appendChild(panel);
   }

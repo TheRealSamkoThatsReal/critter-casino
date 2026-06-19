@@ -134,13 +134,21 @@
 
   // daily egg: a random species from any unlocked tier, preferring one not yet
   // in the Critterdex (helps complete the collection toward prestige).
+  // Favours undiscovered species, but WEIGHTED by rarity (raised to DAILY_POW)
+  // so the rare tail of the Critterdex stays a real grind instead of being
+  // handed to you one-per-day. Lower DAILY_POW => rares even less likely.
+  const DAILY_POW = 0.35;
   function dailyPick() {
     const cap = maxTierUnlocked();
     const cands = allSpecies().filter(function (s) { return s.tier <= cap; });
     if (!cands.length) return null;
     const fresh = cands.filter(function (s) { return !state.discovered[s.id]; });
     const pool = fresh.length ? fresh : cands;
-    return pool[Math.floor(Math.random() * pool.length)];
+    let total = 0;
+    const w = pool.map(function (s) { const x = Math.pow(G.data.rarity(s.tier).weight, DAILY_POW); total += x; return x; });
+    let r = Math.random() * total;
+    for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r <= 0) return pool[i]; }
+    return pool[pool.length - 1];
   }
 
   // pick a random species at exactly a tier (for upgrades)
@@ -282,7 +290,7 @@
   function prestigeMult() { return 1 + 0.5 * (state.prestige || 0); } // +50% income per prestige
   // egg prices & casino value-to-tier scale up each prestige (outpaces income,
   // so each prestige is harder than the last).
-  function progressScale() { return Math.pow(1.6, state.prestige || 0); }
+  function progressScale() { return Math.pow(1.85, state.prestige || 0); }
 
   function doPrestige() {
     if (!canPrestige()) return false;

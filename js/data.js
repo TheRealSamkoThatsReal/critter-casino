@@ -76,6 +76,33 @@
       ['Omega','Void'],['Alpharion','Light'],['Singulon','Cosmic'],['Endbringer','Void'] ]
   };
 
+  // How many distinct species to collect per rarity tier. Tuning this UP makes
+  // each prestige take longer (more to discover, especially in the rare tail).
+  // The hand-made roster above is padded with procedurally-named species up to
+  // these counts. Index === tier (Common .. Omega).
+  const TARGET_PER_TIER = [15, 15, 18, 18, 18, 16, 12, 10, 10, 10, 10, 8, 8];
+
+  // Deterministic name parts for padding (prefix + thematic element, + suffix).
+  // MUST stay stable across loads so generated species ids never change.
+  const GEN_PREFIX = [
+    ['Ember','Fire'],['Cinder','Fire'],['Scorch','Fire'],['Pyro','Fire'],
+    ['Tidal','Water'],['Aqua','Water'],['Mistral','Water'],
+    ['Frost','Ice'],['Glacial','Ice'],['Cryo','Ice'],
+    ['Thorn','Grass'],['Bramble','Grass'],['Verdant','Grass'],
+    ['Volt','Electric'],['Surge','Electric'],['Stormous','Electric'],
+    ['Crag','Rock'],['Bouldra','Rock'],['Terran','Rock'],
+    ['Umbral','Shadow'],['Nox','Shadow'],['Dusk','Shadow'],
+    ['Prism','Light'],['Lumen','Light'],['Radi','Light'],
+    ['Venom','Toxic'],['Mire','Toxic'],
+    ['Gale','Wind'],['Zephyr','Wind'],
+    ['Astra','Cosmic'],['Nebulo','Cosmic'],['Quasa','Cosmic'],
+    ['Ferro','Metal'],['Chroma','Metal'],
+    ['Psyche','Psychic'],['Cogni','Psychic'],
+    ['Voiden','Void'],['Wraith','Spirit'],['Draken','Dragon'],['Luno','Lunar'],['Solen','Solar']
+  ];
+  const GEN_SUFFIX = ['fang','maw','claw','wing','horn','tail','scale','heart','crest','spine',
+    'jaw','hide','roar','gaze','mane','talon','fin','tusk','shard','husk'];
+
   function buildRoster() {
     const list = [];
     const tierByName = { Common:0, Uncommon:1, Rare:2, Epic:3, Legendary:4, Mythic:5, Divine:6,
@@ -86,6 +113,17 @@
         const id = 'c_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
         list.push({ id: id, name: name, element: element, tier: tierByName[rname], spriteSeed: id });
       });
+    });
+    // pad each tier up to its target with deterministic generated species
+    TARGET_PER_TIER.forEach(function (target, tier) {
+      const have = list.filter(function (s) { return s.tier === tier; }).length;
+      for (let i = have; i < target; i++) {
+        const g = tier * 37 + i; // spread so tiers don't share name combos
+        const pre = GEN_PREFIX[g % GEN_PREFIX.length];
+        const suf = GEN_SUFFIX[Math.floor(g / GEN_PREFIX.length) % GEN_SUFFIX.length];
+        const id = 'g_t' + tier + '_' + i;
+        list.push({ id: id, name: pre[0] + suf, element: pre[1], tier: tier, spriteSeed: id });
+      }
     });
     return list;
   }

@@ -7,7 +7,7 @@ with **no backend required**, hosted on GitHub Pages.
 
 ## Features
 
-- **100+ collectible creatures** across 13 rarities: Common → Uncommon → Rare →
+- **160+ collectible creatures** across 13 rarities: Common → Uncommon → Rare →
   Epic → Legendary → Mythic → Divine → Celestial → Astral → Ethereal →
   Primordial → Eternal → Omega. The tiers above Divine are ultra-rare chase
   items (Omega is worth millions). Each creature's value scales with rarity.
@@ -30,8 +30,9 @@ with **no backend required**, hosted on GitHub Pages.
 - **Hatch eggs** to grow your collection; sell duplicates for coins to buy
   better eggs. Paid eggs support **bulk hatching (×10 / ×100)** with a grouped
   results summary, to spend coins fast. A free **Daily Egg** gives a creature
-  from any unlocked rarity, favouring species you haven't collected yet (so it
-  steadily fills your dex).
+  from any unlocked rarity, favouring species you haven't collected yet —
+  *weighted by rarity*, so it fills the easy slots quickly but the rare tail of
+  the Critterdex stays a genuine grind.
 - **Fusion** — combine **3 creatures of one rarity into 1 of the next rarity up**
   (from the Collection's 🔥 Fuse button). Rarity values are ~3× per tier, so it's
   roughly value-neutral — a way to shrink a bloated collection and climb tiers at
