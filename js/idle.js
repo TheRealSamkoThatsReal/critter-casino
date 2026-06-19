@@ -67,11 +67,37 @@
     s.lastFed = Date.now();
     s.lastDeathRoll = s.lastFed;
     G.state.save();
-    G.ui.haptic(20);
-    toast('🍖 Fed your creatures! Income resumed.', 'good');
+    G.ui.haptic([20, 30, 60]);
+    toast('🍖 Fed your creatures! Income restored.', 'good');
     if (G.push && G.push.heartbeat) G.push.heartbeat(); // tell the server they're fed
-    render(document.getElementById('view'));
-    if (window.refreshAll) window.refreshAll();
+    if (window.refreshAll) window.refreshAll(); else render(document.getElementById('view'));
+    updateLive();
+  }
+
+  // Hold-to-feed: must press & hold ~1.5s (progress fill + building rumble) so
+  // you can't feed by reflex-tapping. Releasing early cancels.
+  function wireHold(btn, fill, onComplete) {
+    const DUR = 1500;
+    let raf = null, startTs = 0, holding = false, lastTick = 0;
+    function reset() { holding = false; if (raf) cancelAnimationFrame(raf); raf = null; startTs = 0; fill.style.width = '0%'; btn.classList.remove('holding'); }
+    function frame(ts) {
+      if (!holding) return;
+      if (!startTs) startTs = ts;
+      const p = Math.min(1, (ts - startTs) / DUR);
+      fill.style.width = (p * 100) + '%';
+      if (ts - lastTick > 160) { lastTick = ts; G.ui.haptic(5); }
+      if (p >= 1) { reset(); onComplete(); return; }
+      raf = requestAnimationFrame(frame);
+    }
+    btn.addEventListener('pointerdown', function (e) { e.preventDefault(); if (holding) return; holding = true; lastTick = 0; btn.classList.add('holding'); raf = requestAnimationFrame(frame); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { btn.addEventListener(ev, reset); });
+    btn.addEventListener('click', function (e) { e.preventDefault(); }); // taps do nothing
+  }
+  function feedButton(onDone) {
+    const fill = el('span', { class: 'hold-fill' });
+    const btn = el('button', { class: 'btn primary hold-btn' }, [fill, el('span', { class: 'hold-label', text: '🍖 Hold to feed' })]);
+    wireHold(btn, fill, function () { feed(); if (onDone) onDone(); });
+    return btn;
   }
 
   // Apply hourly death rolls for any starving hours up to `now`. Returns # died.
@@ -195,7 +221,7 @@
     const m = G.ui.modal('', node);
     const acts = [];
     if (st !== 'fed') {
-      acts.push(el('button', { class: 'btn primary', text: '🍖 Feed now', onclick: function () { feed(); m.close(); } }));
+      acts.push(feedButton(function () { m.close(); }));
       acts.push(el('button', { class: 'btn', text: 'Later', onclick: function () { m.close(); } }));
     } else {
       acts.push(el('button', { class: 'btn primary', text: 'Collect', onclick: function () { m.close(); } }));
@@ -215,9 +241,7 @@
       ]),
       el('div', { class: 'feed-sub', text:
         'Feed your creatures every 24h to keep them earning. After 3 days unfed, they may start dying each hour.' }),
-      el('div', { class: 'gaction' }, [
-        el('button', { class: 'btn primary', text: '🍖 Feed all creatures', onclick: feed })
-      ])
+      el('div', { class: 'gaction' }, [feedButton()])
     ]);
     container.appendChild(card);
   }

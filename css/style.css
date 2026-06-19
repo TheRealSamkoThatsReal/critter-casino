@@ -373,6 +373,11 @@ body {
 .feed-card.starving .feed-status { color: #ff7a90; }
 .feed-sub { font-size: 12.5px; color: var(--muted); line-height: 1.4; margin: 6px 0 10px; }
 .feed-card .gaction .btn { width: 100%; }
+/* hold-to-feed button */
+.hold-btn { position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.hold-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: rgba(255,255,255,.32); pointer-events: none; }
+.hold-label { position: relative; z-index: 1; pointer-events: none; }
+.hold-btn.holding { filter: brightness(1.08); }
 .feed-badge { background: linear-gradient(180deg, #4a3a12, #2a2410); color: #ffd75e; border: 1px solid #6e2030;
   border-radius: 999px; padding: 5px 9px; font-size: 15px; line-height: 1; cursor: pointer; }
 .feed-badge.starving { background: #3a1620; border-color: #6e2030; animation: feed-pulse 1.2s ease-in-out infinite; }
