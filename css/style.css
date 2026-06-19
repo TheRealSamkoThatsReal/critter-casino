@@ -523,6 +523,19 @@ body {
 /* ---- black market ---- */
 .bm-panel { border-color: #5a3a3a; background: linear-gradient(135deg, #2a1a1e, #1c1518); }
 
+/* ---- profit multiplier box ---- */
+.mult-box { background: linear-gradient(135deg, #15233a, #121a2c); border-color: #2f4a6e; text-align: center; }
+.mult-total { font-size: 38px; font-weight: 900; line-height: 1; color: #6cf2a0;
+  text-shadow: 0 0 16px rgba(108,242,160,.4); }
+.mult-sub { font-size: 12px; color: var(--muted); margin: 4px 0 10px; }
+.mult-rows { display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.mult-row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 4px;
+  border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.mult-row:last-child { border-bottom: 0; }
+.mult-k { color: var(--muted); }
+.mult-v { font-weight: 800; color: #6cf2a0; }
+.mult-row.warn .mult-v, .mult-row.warn .mult-k { color: #ff9b6b; }
+
 /* ---- records ---- */
 .rec-bar { display: flex; justify-content: flex-end; margin: -4px 0 10px; }
 .records { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }

@@ -374,6 +374,50 @@
     container.appendChild(panel);
   }
 
+  // ---- profit multiplier box ----------------------------------------------
+  function fmtMult(n) {
+    if (n >= 1000) return fmt(Math.round(n));
+    if (n >= 100) return n.toFixed(0);
+    if (n >= 10) return n.toFixed(1);
+    return (Math.round(n * 100) / 100).toString();
+  }
+  function multiplierPanel(container) {
+    const hab = habitatMult(), pres = G.state.prestigeMult(), gold = G.state.stardustIncomeMult();
+    const total = hab * pres * gold;       // applies to every creature
+    const rare = rarityMult();             // extra, Rare-tier and up only
+    const hunger = hungerMult();           // situational
+    const rows = [
+      ['✨ Prestige Lv ' + G.state.prestigeLevel(), pres],
+      ['🏡 Habitat Lv ' + lvl('habitat'), hab],
+      ['⭐ Golden Touch Lv ' + G.state.sdLevel('income'), gold]
+    ];
+    const box = el('div', { class: 'panel mult-box' });
+    box.appendChild(el('h3', { text: '📊 Profit Multiplier' }));
+    box.appendChild(el('div', { class: 'mult-total', html: '×' + fmtMult(total) }));
+    box.appendChild(el('div', { class: 'mult-sub', text: 'applied to every creature\'s base income' }));
+    const tbl = el('div', { class: 'mult-rows' });
+    rows.forEach(function (r) {
+      tbl.appendChild(el('div', { class: 'mult-row' }, [
+        el('span', { class: 'mult-k', text: r[0] }),
+        el('span', { class: 'mult-v', text: '×' + fmtMult(r[1]) })
+      ]));
+    });
+    if (rare > 1) {
+      tbl.appendChild(el('div', { class: 'mult-row' }, [
+        el('span', { class: 'mult-k', text: '💎 Gilded Cages Lv ' + lvl('rarity') + ' (Rare+ only)' }),
+        el('span', { class: 'mult-v', text: '×' + fmtMult(rare) })
+      ]));
+    }
+    if (hunger < 1) {
+      tbl.appendChild(el('div', { class: 'mult-row warn' }, [
+        el('span', { class: 'mult-k', text: '🍽️ Hungry (feed to restore!)' }),
+        el('span', { class: 'mult-v', text: '×' + fmtMult(hunger) })
+      ]));
+    }
+    box.appendChild(tbl);
+    container.appendChild(box);
+  }
+
   // ---- records / milestones scoreboard ------------------------------------
   function openRecords() {
     const s = G.state.get();
@@ -520,6 +564,8 @@
         el('span', { text: 'earners' })
       ])
     ]));
+
+    multiplierPanel(container);
 
     if (!s.inv.length) {
       container.appendChild(el('div', { class: 'empty', html:
