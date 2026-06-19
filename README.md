@@ -80,8 +80,9 @@ python3 -m http.server 8000
 
 ## Admin
 
-The Admin tab is hidden by default. To reveal it, **tap the 🔊/🔇 mute button
-in the top bar six times quickly** (toggle it on/off three times). Then open the
-Admin tab and enter the passcode (default `admin` on a fresh save — change it in
-the panel's "Admin Passcode" section). Because this is a purely client-side app,
-the passcode is only a soft gate, not real security.
+There is no Admin tab in the nav. To open the admin panel, **tap the 🔊/🔇 mute
+button in the top bar six times quickly** (toggle it on/off three times) — that
+secret knock takes you straight to the panel. Then enter the passcode (default
+`admin` on a fresh save — change it in the panel's "Admin Passcode" section).
+Leave the panel by tapping any bottom-nav tab. Because this is a purely
+client-side app, the passcode is only a soft gate, not real security.

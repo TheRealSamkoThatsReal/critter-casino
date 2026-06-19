@@ -422,10 +422,10 @@
         const now = Date.now();
         knock = (now - knockAt < 1500) ? knock + 1 : 1; // must be in quick succession
         knockAt = now;
-        const adminBtn = document.querySelector('.navbtn[data-view="admin"]');
-        if (knock >= 6 && adminBtn && adminBtn.hidden) {
-          adminBtn.hidden = false; knock = 0;
-          G.ui.toast('🛠 Admin panel unlocked.', 'good');
+        if (knock >= 6 && current !== 'admin') {
+          knock = 0;
+          G.ui.toast('🛠 Opening admin panel…', 'good');
+          navigate('admin'); // hidden panel: only reachable via this secret knock
         }
       });
     }
