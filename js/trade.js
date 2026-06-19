@@ -57,10 +57,7 @@
     const grid = el('div', { class: 'grid pick-grid' });
     const wrap = el('div', {}, [
       el('p', { class: 'gdesc', text: 'Tap creatures you want to give away, then create the offer code.' }),
-      grid,
-      el('div', { class: 'gaction sticky-submit' }, [
-        el('button', { class: 'btn primary', text: 'Create offer code', onclick: make })
-      ])
+      grid
     ]);
     inv.forEach(function (item) {
       const c = G.ui.card(item, { size: 56, onClick: function (it, node) {
@@ -69,7 +66,9 @@
       } });
       grid.appendChild(c);
     });
-    const m = G.ui.modal('Create Trade Offer', wrap);
+    const m = G.ui.modal('Create Trade Offer', wrap, {
+      footer: el('button', { class: 'btn primary', text: 'Create offer code', onclick: make })
+    });
     function make() {
       const items = Object.keys(selected).map(function (k) { return selected[k]; });
       if (!items.length) { toast('Select at least one creature.', 'bad'); return; }
@@ -83,6 +82,7 @@
         give: items.map(strip)
       };
       const code = encode(offer);
+      m.setFooter(null);
       m.body.innerHTML = '';
       m.body.appendChild(el('div', { class: 'gresult good', text: 'Offer created & escrowed!' }));
       m.body.appendChild(codeBox(code,
@@ -147,10 +147,9 @@
       } }));
     });
     m.body.appendChild(myGrid);
-    m.body.appendChild(el('div', { class: 'gaction sticky-submit' }, [
-      el('button', { class: 'btn primary', text: 'Accept trade', onclick: accept })
-    ]));
+    m.setFooter(el('button', { class: 'btn primary', text: 'Accept trade', onclick: accept }));
     function accept() {
+      m.setFooter(null);
       // receive offered creatures
       offer.give.forEach(function (it) { G.state.addInstance(G.state.mkInstance(it.sid, it.shiny)); });
       // escrow my give-back

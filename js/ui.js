@@ -90,16 +90,25 @@
     const body = el('div', { class: 'modal-body' });
     body.appendChild(contentNode);
     box.appendChild(body);
+    // optional footer pinned below the scrolling body (robust across browsers)
+    let footEl = null;
+    function setFooter(node) {
+      if (!node) { if (footEl) { footEl.remove(); footEl = null; } return; }
+      if (!footEl) { footEl = el('div', { class: 'modal-foot' }); box.appendChild(footEl); }
+      footEl.innerHTML = '';
+      footEl.appendChild(node);
+    }
     overlay.appendChild(box);
     overlay.addEventListener('click', function (e) { if (e.target === overlay && opts.dismiss !== false) close(); });
     document.body.appendChild(overlay);
+    if (opts.footer) setFooter(opts.footer);
     requestAnimationFrame(function () { overlay.classList.add('show'); });
     function close() {
       overlay.classList.remove('show');
       setTimeout(function () { overlay.remove(); }, 200);
       if (opts.onClose) opts.onClose();
     }
-    return { close: close, body: body, overlay: overlay };
+    return { close: close, body: body, overlay: overlay, setFooter: setFooter };
   }
 
   // reveal animation for a newly obtained creature

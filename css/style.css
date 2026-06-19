@@ -187,14 +187,19 @@ body {
   opacity: 0; transition: opacity .2s; backdrop-filter: blur(3px); }
 .overlay.show { opacity: 1; }
 .modal { background: linear-gradient(180deg, var(--panel), var(--bg2)); border: 1px solid var(--line);
-  border-radius: 18px; width: 100%; max-width: 440px; max-height: 86vh; overflow-y: auto;
+  border-radius: 18px; width: 100%; max-width: 440px; max-height: 86vh; overflow: hidden;
+  display: flex; flex-direction: column;
   transform: translateY(12px) scale(.98); transition: transform .2s; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
 .overlay.show .modal { transform: none; }
-.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px; }
+.modal-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px; }
 .modal-head h3 { margin: 0; font-size: 17px; }
 .modal-head .x { background: none; border: 0; color: var(--muted); font-size: 18px; cursor: pointer; }
-.modal-body { padding: 6px 16px 18px; }
+.modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 6px 16px 18px; }
 .modal-body h4 { margin: 12px 0 6px; }
+.modal-foot { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center;
+  padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line);
+  background: var(--bg2); }
+.modal-foot .btn { min-width: 220px; }
 
 .detail { text-align: center; }
 .detail-sprite { display: inline-flex; padding: 16px; margin: 6px auto; border-radius: 18px;
@@ -240,11 +245,6 @@ body {
   background: radial-gradient(circle at 50% 42%, rgba(108,92,255,.20), rgba(8,6,20,0) 68%); }
 .gaction { margin-top: 14px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .gaction .btn { min-width: 160px; }
-/* submit button pinned to the bottom of a long picker modal */
-.sticky-submit { position: sticky; bottom: 0; z-index: 3;
-  margin: 8px -16px -18px; padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, rgba(27,24,48,0), var(--bg2) 45%); }
-.sticky-submit .btn { min-width: 220px; }
 .gresult { font-size: 17px; font-weight: 800; }
 .gresult.good { color: var(--good); } .gresult.bad { color: var(--bad); }
 .gsub { font-size: 13px; color: var(--muted); margin-top: -4px; }

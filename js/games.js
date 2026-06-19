@@ -90,8 +90,7 @@
       el('p', { class: 'gdesc', text: 'Pick creatures to wager — their combined value is your stake. Bigger stakes can win rarer creatures!' }),
       info, tools, grid
     ]);
-    const m = G.ui.modal('Choose your wager', wrap);
-    wrap.appendChild(el('div', { class: 'gaction sticky-submit' }, [goBtn]));
+    const m = G.ui.modal('Choose your wager', wrap, { footer: goBtn });
     goBtn.addEventListener('click', function () {
       const items = Object.keys(selected).map(function (k) { return selected[k]; });
       if (!items.length) return;
