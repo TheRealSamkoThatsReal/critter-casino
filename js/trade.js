@@ -295,27 +295,29 @@
     return { grid: grid, list: function () { return Object.keys(selected).map(function (k) { return selected[k]; }); } };
   }
 
+  function addItems(tokens) { fromTokens(tokens).forEach(function (it) { G.state.addInstance(G.state.mkInstance(it.sid, it.shiny)); }); }
+
   function renderBoardInto(listEl) {
     listEl.innerHTML = '';
-    listEl.appendChild(el('p', { class: 'gdesc', text: 'Loading trades…' }));
+    listEl.appendChild(el('p', { class: 'gdesc', text: 'Loading listings…' }));
     api('/trade/list').then(function (res) {
       const trades = (res && res.trades) || [];
       listEl.innerHTML = '';
-      if (!trades.length) { listEl.appendChild(el('p', { class: 'gdesc', text: 'No open trades right now — post one!' })); return; }
+      if (!trades.length) { listEl.appendChild(el('p', { class: 'gdesc', text: 'No open listings right now — post one!' })); return; }
       trades.forEach(function (t) {
         const mine = t.owner.id === me().id;
-        const row = el('div', { class: 'trade-row' }, [
+        listEl.appendChild(el('div', { class: 'trade-row' }, [
           el('div', { class: 'trade-row-head' }, [
             el('span', { class: 'trade-owner', text: t.owner.name || 'Trainer' }),
             t.want ? el('span', { class: 'trade-want', text: '“' + t.want + '”' }) : null
           ]),
           spriteRow(fromTokens(t.give)),
           el('div', { class: 'gaction' }, [
-            mine ? el('span', { class: 'gsub', text: 'Your trade' })
-                 : el('button', { class: 'btn small primary', text: 'Claim', onclick: function () { claimTrade(t); } })
+            el('span', { class: 'gsub', text: (t.offerCount || 0) + ' offer' + (t.offerCount === 1 ? '' : 's') }),
+            mine ? el('span', { class: 'gsub', text: 'Your listing' })
+                 : el('button', { class: 'btn small primary', text: 'Make Offer', onclick: function () { makeOffer(t); } })
           ])
-        ]);
-        listEl.appendChild(row);
+        ]));
       });
     }).catch(function () { listEl.innerHTML = ''; listEl.appendChild(el('p', { class: 'gdesc', text: '⚠️ Trade server unavailable.' })); });
   }
@@ -323,13 +325,13 @@
   function postTrade() {
     const pg = pickGrid(50);
     if (!pg.grid.children.length) { toast('No tradeable creatures to offer.', 'bad'); return; }
-    const wantInp = el('input', { class: 'a-input', placeholder: 'What you\'re hoping for (optional)', maxlength: 80 });
+    const wantInp = el('input', { class: 'a-input', placeholder: 'What you want in return (optional)', maxlength: 80 });
     const wrap = el('div', {}, [
-      el('p', { class: 'gdesc', text: 'Pick creatures to offer on the public board. The first player to claim them gets them.' }),
+      el('p', { class: 'gdesc', text: 'List creatures on the board. Other players make offers; you choose which to accept.' }),
       wantInp, pg.grid
     ]);
-    const goBtn = el('button', { class: 'btn primary', text: 'Post to board' });
-    const m = G.ui.modal('Post a Trade', wrap, { footer: goBtn });
+    const goBtn = el('button', { class: 'btn primary', text: 'Post listing' });
+    const m = G.ui.modal('Post a Listing', wrap, { footer: goBtn });
     goBtn.addEventListener('click', function () {
       const items = pg.list();
       if (!items.length) { toast('Select at least one creature.', 'bad'); return; }
@@ -337,71 +339,126 @@
       api('/trade/post', 'POST', { owner: { id: me().id, name: me().name }, give: toTokens(items), want: wantInp.value })
         .then(function (res) {
           if (!res || !res.ok) { toast((res && res.error) || 'Post failed.', 'bad'); goBtn.disabled = false; return; }
-          items.forEach(function (it) { G.state.removeInstance(it.iid); }); // escrow after server confirms
-          G.state.save();
-          m.close(); toast('Posted to the board!', 'good');
+          items.forEach(function (it) { G.state.removeInstance(it.iid); }); G.state.save(); // escrow
+          m.close(); toast('Listing posted!', 'good');
           if (window.refreshAll) window.refreshAll();
         })
         .catch(function () { toast('Trade server unavailable.', 'bad'); goBtn.disabled = false; });
     });
   }
 
-  function claimTrade(t) {
+  function makeOffer(t) {
     const wrap = el('div', {});
     wrap.appendChild(el('p', { class: 'gdesc', html: '<b>' + (t.owner.name || 'Trainer') + '</b> is offering:' }));
     wrap.appendChild(spriteRow(fromTokens(t.give), 52));
     if (t.want) wrap.appendChild(el('p', { class: 'gdesc', text: 'They want: ' + t.want }));
-    wrap.appendChild(el('p', { class: 'gdesc', text: 'Give creatures back (optional):' }));
+    wrap.appendChild(el('p', { class: 'gdesc', text: 'Pick creatures to offer (held until they accept or decline):' }));
     const pg = pickGrid(48);
     wrap.appendChild(pg.grid);
-    const goBtn = el('button', { class: 'btn primary', text: 'Claim trade' });
-    const m = G.ui.modal('Claim trade', wrap, { footer: goBtn });
+    const goBtn = el('button', { class: 'btn primary', text: 'Send offer' });
+    const m = G.ui.modal('Make an Offer', wrap, { footer: goBtn });
     goBtn.addEventListener('click', function () {
+      const items = pg.list();
+      if (!items.length) { toast('Pick at least one creature.', 'bad'); return; }
       goBtn.disabled = true;
-      const back = pg.list();
-      api('/trade/claim', 'POST', { id: t.id, claimer: { id: me().id, name: me().name }, give: toTokens(back) })
+      api('/trade/offer', 'POST', { listingId: t.id, bidder: { id: me().id, name: me().name }, give: toTokens(items) })
         .then(function (res) {
-          if (!res || !res.ok) { toast(res && res.error === 'unavailable' ? 'Too late — already claimed!' : 'Claim failed.', 'bad'); m.close(); return; }
-          fromTokens(res.give).forEach(function (it) { G.state.addInstance(G.state.mkInstance(it.sid, it.shiny)); });
-          back.forEach(function (it) { G.state.removeInstance(it.iid); }); // escrow give-back to the owner
-          G.state.get().stats.traded++; G.state.save();
-          m.close(); toast('Trade claimed! 🎉', 'good');
+          if (!res || !res.ok) { toast((res && res.error) || 'Offer failed.', 'bad'); goBtn.disabled = false; return; }
+          items.forEach(function (it) { G.state.removeInstance(it.iid); }); G.state.save(); // escrow
+          m.close(); toast('Offer sent! 📨', 'good');
           if (window.refreshAll) window.refreshAll();
         })
         .catch(function () { toast('Trade server unavailable.', 'bad'); goBtn.disabled = false; });
     });
   }
 
-  function myTrades() {
+  function myListings() {
     const wrap = el('div', {}, [el('p', { class: 'gdesc', text: 'Loading…' })]);
-    const m = G.ui.modal('My Trades', wrap);
+    const m = G.ui.modal('My Listings', wrap);
     function reload() {
-      api('/trade-mine', 'POST', { ownerId: me().id }).then(function (res) {
+      api('/trade/mine-listings', 'POST', { ownerId: me().id }).then(function (res) {
         wrap.innerHTML = '';
-        const trades = (res && res.trades) || [];
-        if (!trades.length) { wrap.appendChild(el('p', { class: 'gdesc', text: 'You have no active trades.' })); return; }
-        trades.forEach(function (t) {
-          const row = el('div', { class: 'trade-row' }, [spriteRow(fromTokens(t.give), 44)]);
-          if (t.status === 'open') {
+        const ls = (res && res.listings) || [];
+        if (!ls.length) { wrap.appendChild(el('p', { class: 'gdesc', text: 'No open listings.' })); return; }
+        ls.forEach(function (L) {
+          const block = el('div', { class: 'trade-row' });
+          block.appendChild(el('div', { class: 'trade-row-head' }, [
+            el('span', { class: 'trade-owner', text: 'You offer:' }),
+            L.want ? el('span', { class: 'trade-want', text: '“' + L.want + '”' }) : null
+          ]));
+          block.appendChild(spriteRow(fromTokens(L.give), 44));
+          if (!L.offers.length) block.appendChild(el('p', { class: 'gsub', text: 'No offers yet.' }));
+          L.offers.forEach(function (o) {
+            block.appendChild(el('div', { class: 'offer-row' }, [
+              el('div', { class: 'gsub', text: (o.bidder.name || 'Trainer') + ' offers:' }),
+              spriteRow(fromTokens(o.give), 40),
+              el('div', { class: 'gaction' }, [
+                el('button', { class: 'btn small primary', text: 'Accept', onclick: function () {
+                  api('/trade/accept', 'POST', { listingId: L.id, ownerId: me().id, offerId: o.offerId }).then(function (r) {
+                    if (r && r.ok) { addItems(r.ownerGets); G.state.get().stats.traded++; G.state.save(); toast('Accepted — you got their creatures! 🎉', 'good'); if (window.refreshAll) window.refreshAll(); reload(); }
+                    else toast((r && r.error) || 'Could not accept.', 'bad');
+                  }).catch(function () { toast('Server unavailable.', 'bad'); });
+                } }),
+                el('button', { class: 'btn small', text: 'Decline', onclick: function () {
+                  api('/trade/decline', 'POST', { listingId: L.id, ownerId: me().id, offerId: o.offerId }).then(function (r) {
+                    if (r && r.ok) { toast('Declined.', ''); reload(); } else toast('Could not decline.', 'bad');
+                  }).catch(function () { toast('Server unavailable.', 'bad'); });
+                } })
+              ])
+            ]));
+          });
+          block.appendChild(el('div', { class: 'gaction' }, [
+            el('button', { class: 'btn small', text: 'Cancel listing', onclick: function () {
+              api('/trade/cancel', 'POST', { listingId: L.id, ownerId: me().id }).then(function (r) {
+                if (r && r.ok) { addItems(r.give); G.state.save(); toast('Listing cancelled, creatures reclaimed.', 'good'); if (window.refreshAll) window.refreshAll(); reload(); }
+                else toast('Could not cancel.', 'bad');
+              }).catch(function () { toast('Server unavailable.', 'bad'); });
+            } })
+          ]));
+          wrap.appendChild(block);
+        });
+      }).catch(function () { wrap.innerHTML = ''; wrap.appendChild(el('p', { class: 'gdesc', text: '⚠️ Trade server unavailable.' })); });
+    }
+    reload();
+  }
+
+  function myOffers() {
+    const wrap = el('div', {}, [el('p', { class: 'gdesc', text: 'Loading…' })]);
+    const m = G.ui.modal('My Offers', wrap);
+    function collect(o) {
+      api('/trade/collect', 'POST', { offerId: o.offerId, bidderId: me().id }).then(function (r) {
+        if (r && r.ok) { addItems(r.give); if (r.won) G.state.get().stats.traded++; G.state.save(); toast(r.won ? 'Collected your trade! 🎉' : 'Refund collected.', 'good'); if (window.refreshAll) window.refreshAll(); reload(); }
+        else toast('Could not collect.', 'bad');
+      }).catch(function () { toast('Server unavailable.', 'bad'); });
+    }
+    function reload() {
+      api('/trade/mine-offers', 'POST', { bidderId: me().id }).then(function (res) {
+        wrap.innerHTML = '';
+        const offs = ((res && res.offers) || []).filter(function (o) { return !o.collected; });
+        if (!offs.length) { wrap.appendChild(el('p', { class: 'gdesc', text: 'No active offers.' })); return; }
+        offs.forEach(function (o) {
+          const owner = (o.listing && o.listing.owner) || 'a trainer';
+          const row = el('div', { class: 'trade-row' });
+          if (o.status === 'pending') {
+            row.appendChild(el('div', { class: 'gsub', text: 'Pending → ' + owner + '. You offered:' }));
+            row.appendChild(spriteRow(fromTokens(o.give), 40));
+            if (o.listing) { row.appendChild(el('div', { class: 'gsub', text: 'For their:' })); row.appendChild(spriteRow(fromTokens(o.listing.give), 40)); }
             row.appendChild(el('div', { class: 'gaction' }, [
-              el('span', { class: 'gsub', text: 'Open on board' }),
-              el('button', { class: 'btn small', text: 'Cancel & reclaim', onclick: function () {
-                api('/trade/cancel', 'POST', { id: t.id, ownerId: me().id }).then(function (r) {
-                  if (r && r.ok) { fromTokens(r.give).forEach(function (it) { G.state.addInstance(G.state.mkInstance(it.sid, it.shiny)); }); G.state.save(); toast('Reclaimed.', 'good'); if (window.refreshAll) window.refreshAll(); reload(); }
-                  else toast('Could not cancel.', 'bad');
+              el('button', { class: 'btn small', text: 'Withdraw', onclick: function () {
+                api('/trade/withdraw', 'POST', { offerId: o.offerId, bidderId: me().id }).then(function (r) {
+                  if (r && r.ok) { addItems(r.give); G.state.save(); toast('Offer withdrawn.', 'good'); if (window.refreshAll) window.refreshAll(); reload(); }
+                  else toast('Could not withdraw.', 'bad');
                 }).catch(function () { toast('Server unavailable.', 'bad'); });
               } })
             ]));
-          } else if (t.status === 'claimed') {
-            row.appendChild(el('div', { class: 'gaction' }, [
-              el('span', { class: 'gsub', text: 'Claimed by ' + ((t.claimer && t.claimer.name) || 'someone') }),
-              el('button', { class: 'btn small primary', text: 'Collect return', onclick: function () {
-                api('/trade/collect', 'POST', { id: t.id, ownerId: me().id }).then(function (r) {
-                  if (r && r.ok) { fromTokens(r.give).forEach(function (it) { G.state.addInstance(G.state.mkInstance(it.sid, it.shiny)); }); G.state.save(); toast((r.give && r.give.length) ? 'Collected!' : 'Nothing to collect.', 'good'); if (window.refreshAll) window.refreshAll(); reload(); }
-                  else toast('Could not collect.', 'bad');
-                }).catch(function () { toast('Server unavailable.', 'bad'); });
-              } })
-            ]));
+          } else if (o.status === 'accepted') {
+            row.appendChild(el('div', { class: 'gresult good', text: '🎉 ' + owner + ' accepted! Claim:' }));
+            row.appendChild(spriteRow(fromTokens(o.payout || []), 44));
+            row.appendChild(el('div', { class: 'gaction' }, [el('button', { class: 'btn small primary', text: 'Collect', onclick: function () { collect(o); } })]));
+          } else if (o.status === 'declined') {
+            row.appendChild(el('div', { class: 'gsub', text: owner + ' declined — reclaim your creatures:' }));
+            row.appendChild(spriteRow(fromTokens(o.payout || []), 40));
+            row.appendChild(el('div', { class: 'gaction' }, [el('button', { class: 'btn small', text: 'Collect refund', onclick: function () { collect(o); } })]));
           }
           wrap.appendChild(row);
         });
@@ -414,7 +471,7 @@
     container.innerHTML = '';
     container.appendChild(el('h2', { class: 'view-title', text: '🤝 Trade' }));
     container.appendChild(el('p', { class: 'view-sub', text:
-      'Post creatures to the live board — first to claim gets them. Each trade can only be claimed once.' }));
+      'List creatures on the board. Players make offers; you accept or decline.' }));
     const meP = me();
     container.appendChild(el('div', { class: 'name-row' }, [
       el('label', { text: 'Your trainer name: ' }),
@@ -428,8 +485,9 @@
     if (serverBase()) {
       const list = el('div', { class: 'trade-board' });
       container.appendChild(el('div', { class: 'trade-actions' }, [
-        el('button', { class: 'btn primary', text: '➕ Post Trade', onclick: postTrade }),
-        el('button', { class: 'btn', text: '📦 My Trades', onclick: myTrades }),
+        el('button', { class: 'btn primary', text: '➕ Post', onclick: postTrade }),
+        el('button', { class: 'btn', text: '📋 My Listings', onclick: myListings }),
+        el('button', { class: 'btn', text: '💌 My Offers', onclick: myOffers }),
         el('button', { class: 'btn', text: '↻', title: 'Refresh', onclick: function () { renderBoardInto(list); } })
       ]));
       container.appendChild(el('h3', { class: 'lobby-head', text: '🛒 Trade Board' }));

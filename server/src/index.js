@@ -46,71 +46,124 @@ function person(p) {
   p = p || {};
   return { id: String(p.id || '').slice(0, 40), name: String(p.name || 'Trainer').slice(0, 20) };
 }
-function rowToTrade(r) {
-  return {
-    id: r.id, owner: { id: r.owner_id, name: r.owner_name }, give: JSON.parse(r.give),
-    want: r.want || '', status: r.status, created: r.created,
-    claimer: r.claimer_id ? { id: r.claimer_id, name: r.claimer_name } : null,
-    ownerGets: r.owner_gets ? JSON.parse(r.owner_gets) : null
-  };
+function rowListing(r) {
+  return { id: r.id, owner: { id: r.owner_id, name: r.owner_name }, give: JSON.parse(r.give), want: r.want || '', status: r.status, created: r.created };
+}
+function rowOffer(r) {
+  return { offerId: r.offer_id, listingId: r.listing_id, bidder: { id: r.bidder_id, name: r.bidder_name }, give: JSON.parse(r.give),
+    status: r.status, payout: r.payout ? JSON.parse(r.payout) : null, collected: !!r.collected, created: r.created };
 }
 
-// Strongly-consistent, single-claim trade board. One DO instance ("board")
-// serializes all operations, so posts are visible immediately and a trade can
-// only be claimed once (no dup exploit, no KV list lag). Low traffic -> a single
-// instance is fine here.
+// Marketplace trade board. One DO instance ("board") serializes everything, so
+// it's strongly consistent + atomic. Players POST listings; others make OFFERS
+// (their creatures escrowed); the owner ACCEPTs one (gets that bidder's
+// creatures; the winner & rejected bidders collect via their offers) or DECLINEs.
 export class TradeBoard extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
     ctx.blockConcurrencyWhile(async () => {
-      this.sql.exec('CREATE TABLE IF NOT EXISTS trades (' +
-        'id TEXT PRIMARY KEY, owner_id TEXT, owner_name TEXT, give TEXT, want TEXT, ' +
-        'status TEXT, created INTEGER, claimer_id TEXT, claimer_name TEXT, owner_gets TEXT)');
+      this.sql.exec('CREATE TABLE IF NOT EXISTS listings (id TEXT PRIMARY KEY, owner_id TEXT, owner_name TEXT, give TEXT, want TEXT, status TEXT, created INTEGER)');
+      this.sql.exec('CREATE TABLE IF NOT EXISTS offers (offer_id TEXT PRIMARY KEY, listing_id TEXT, bidder_id TEXT, bidder_name TEXT, give TEXT, status TEXT, payout TEXT, collected INTEGER, created INTEGER)');
     });
   }
+  _listing(id) { return this.sql.exec('SELECT * FROM listings WHERE id=?', String(id || '')).toArray()[0]; }
+  _offer(id) { return this.sql.exec('SELECT * FROM offers WHERE offer_id=?', String(id || '')).toArray()[0]; }
+
   post(owner, give, want) {
     const g = cleanTokens(give); if (!g || !g.length) return { error: 'nothing to give' };
     const o = person(owner); if (!o.id) return { error: 'no owner' };
-    const n = this.sql.exec("SELECT COUNT(*) c FROM trades WHERE owner_id=? AND status='open'", o.id).one().c;
-    if (n >= 20) return { error: 'too many open trades' };
+    const n = this.sql.exec("SELECT COUNT(*) c FROM listings WHERE owner_id=? AND status='open'", o.id).one().c;
+    if (n >= 20) return { error: 'too many listings' };
     const id = tid();
-    this.sql.exec('INSERT INTO trades (id,owner_id,owner_name,give,want,status,created,claimer_id,claimer_name,owner_gets) VALUES (?,?,?,?,?,?,?,?,?,?)',
-      id, o.id, o.name, JSON.stringify(g), String(want || '').slice(0, 80), 'open', Date.now(), null, null, null);
+    this.sql.exec('INSERT INTO listings (id,owner_id,owner_name,give,want,status,created) VALUES (?,?,?,?,?,?,?)',
+      id, o.id, o.name, JSON.stringify(g), String(want || '').slice(0, 80), 'open', Date.now());
     return { ok: true, id: id };
   }
   list() {
-    const rows = this.sql.exec("SELECT * FROM trades WHERE status='open' ORDER BY created DESC LIMIT 60").toArray();
-    return { ok: true, trades: rows.map(rowToTrade) };
+    const rows = this.sql.exec("SELECT * FROM listings WHERE status='open' ORDER BY created DESC LIMIT 60").toArray();
+    const out = [];
+    for (const r of rows) {
+      const t = rowListing(r);
+      t.offerCount = this.sql.exec("SELECT COUNT(*) c FROM offers WHERE listing_id=? AND status='pending'", r.id).one().c;
+      out.push(t);
+    }
+    return { ok: true, trades: out };
   }
-  mine(ownerId) {
-    const rows = this.sql.exec('SELECT * FROM trades WHERE owner_id=? ORDER BY created DESC', String(ownerId || '')).toArray();
-    return { ok: true, trades: rows.map(rowToTrade) };
+  offer(listingId, bidder, give) {
+    const L = this._listing(listingId);
+    if (!L || L.status !== 'open') return { error: 'listing unavailable' };
+    const b = person(bidder); if (!b.id) return { error: 'no bidder' };
+    if (b.id === L.owner_id) return { error: 'own listing' };
+    const g = cleanTokens(give); if (!g || !g.length) return { error: 'nothing offered' };
+    const n = this.sql.exec("SELECT COUNT(*) c FROM offers WHERE bidder_id=? AND status='pending'", b.id).one().c;
+    if (n >= 30) return { error: 'too many pending offers' };
+    const oid = tid();
+    this.sql.exec('INSERT INTO offers (offer_id,listing_id,bidder_id,bidder_name,give,status,payout,collected,created) VALUES (?,?,?,?,?,?,?,?,?)',
+      oid, L.id, b.id, b.name, JSON.stringify(g), 'pending', null, 0, Date.now());
+    return { ok: true, offerId: oid };
   }
-  claim(id, claimer, back) {
-    const row = this.sql.exec('SELECT * FROM trades WHERE id=?', String(id || '')).toArray()[0];
-    if (!row) return { error: 'not found' };
-    if (row.status !== 'open') return { error: 'unavailable' };
-    const c = person(claimer);
-    if (c.id && c.id === row.owner_id) return { error: 'own trade' };
-    const b = cleanTokens(back) || [];
-    if (b.length) this.sql.exec("UPDATE trades SET status='claimed', claimer_id=?, claimer_name=?, owner_gets=? WHERE id=?", c.id, c.name, JSON.stringify(b), row.id);
-    else this.sql.exec('DELETE FROM trades WHERE id=?', row.id);
-    return { ok: true, give: JSON.parse(row.give) };
+  myListings(ownerId) {
+    const rows = this.sql.exec("SELECT * FROM listings WHERE owner_id=? AND status='open' ORDER BY created DESC", String(ownerId || '')).toArray();
+    const out = [];
+    for (const r of rows) {
+      const t = rowListing(r);
+      t.offers = this.sql.exec("SELECT * FROM offers WHERE listing_id=? AND status='pending' ORDER BY created", r.id).toArray().map(rowOffer);
+      out.push(t);
+    }
+    return { ok: true, listings: out };
   }
-  collect(id, ownerId) {
-    const row = this.sql.exec('SELECT * FROM trades WHERE id=?', String(id || '')).toArray()[0];
-    if (!row || row.owner_id !== String(ownerId || '')) return { error: 'not owner' };
-    if (row.status !== 'claimed' || !row.owner_gets) return { ok: true, give: [] };
-    this.sql.exec('DELETE FROM trades WHERE id=?', row.id);
-    return { ok: true, give: JSON.parse(row.owner_gets) };
+  myOffers(bidderId) {
+    const rows = this.sql.exec('SELECT * FROM offers WHERE bidder_id=? ORDER BY created DESC', String(bidderId || '')).toArray();
+    const out = [];
+    for (const r of rows) {
+      const o = rowOffer(r);
+      const L = this._listing(r.listing_id);
+      o.listing = L ? { give: JSON.parse(L.give), owner: L.owner_name, want: L.want || '' } : null;
+      out.push(o);
+    }
+    return { ok: true, offers: out };
   }
-  cancel(id, ownerId) {
-    const row = this.sql.exec('SELECT * FROM trades WHERE id=?', String(id || '')).toArray()[0];
-    if (!row || row.owner_id !== String(ownerId || '')) return { error: 'not owner' };
-    if (row.status !== 'open') return { error: 'cannot cancel' };
-    this.sql.exec('DELETE FROM trades WHERE id=?', row.id);
-    return { ok: true, give: JSON.parse(row.give) };
+  accept(listingId, ownerId, offerId) {
+    const L = this._listing(listingId);
+    if (!L || L.owner_id !== String(ownerId || '')) return { error: 'not owner' };
+    if (L.status !== 'open') return { error: 'closed' };
+    const O = this.sql.exec('SELECT * FROM offers WHERE offer_id=? AND listing_id=?', String(offerId || ''), L.id).toArray()[0];
+    if (!O || O.status !== 'pending') return { error: 'offer gone' };
+    this.sql.exec("UPDATE offers SET status='accepted', payout=? WHERE offer_id=?", L.give, O.offer_id); // winner collects the listing
+    this.sql.exec("UPDATE offers SET status='declined', payout=give WHERE listing_id=? AND status='pending'", L.id); // others refunded
+    this.sql.exec("UPDATE listings SET status='completed' WHERE id=?", L.id);
+    return { ok: true, ownerGets: JSON.parse(O.give) }; // owner receives the accepted bidder's creatures now
+  }
+  decline(listingId, ownerId, offerId) {
+    const L = this._listing(listingId);
+    if (!L || L.owner_id !== String(ownerId || '')) return { error: 'not owner' };
+    const O = this.sql.exec('SELECT * FROM offers WHERE offer_id=? AND listing_id=?', String(offerId || ''), L.id).toArray()[0];
+    if (!O || O.status !== 'pending') return { error: 'offer gone' };
+    this.sql.exec("UPDATE offers SET status='declined', payout=give WHERE offer_id=?", O.offer_id);
+    return { ok: true };
+  }
+  cancel(listingId, ownerId) {
+    const L = this._listing(listingId);
+    if (!L || L.owner_id !== String(ownerId || '')) return { error: 'not owner' };
+    if (L.status !== 'open') return { error: 'closed' };
+    this.sql.exec("UPDATE offers SET status='declined', payout=give WHERE listing_id=? AND status='pending'", L.id);
+    this.sql.exec("UPDATE listings SET status='cancelled' WHERE id=?", L.id);
+    return { ok: true, give: JSON.parse(L.give) };
+  }
+  withdraw(offerId, bidderId) {
+    const O = this._offer(offerId);
+    if (!O || O.bidder_id !== String(bidderId || '')) return { error: 'not yours' };
+    if (O.status !== 'pending') return { error: 'cannot withdraw' };
+    this.sql.exec('DELETE FROM offers WHERE offer_id=?', O.offer_id);
+    return { ok: true, give: JSON.parse(O.give) };
+  }
+  collect(offerId, bidderId) {
+    const O = this._offer(offerId);
+    if (!O || O.bidder_id !== String(bidderId || '')) return { error: 'not yours' };
+    if ((O.status !== 'accepted' && O.status !== 'declined') || O.collected || !O.payout) return { ok: true, give: [] };
+    this.sql.exec('DELETE FROM offers WHERE offer_id=?', O.offer_id);
+    return { ok: true, give: JSON.parse(O.payout), won: O.status === 'accepted' };
   }
 }
 function board(env) { return env.TRADE.get(env.TRADE.idFromName('board')); }
@@ -175,17 +228,19 @@ export default {
     if (request.method === 'POST' && url.pathname.indexOf('/trade/') === 0) {
       let b;
       try { b = await request.json(); } catch (e) { return json({ error: 'bad json' }, 400); }
-      const op = url.pathname.slice('/trade/'.length);
       const bd = board(env);
-      if (op === 'post') return json(await bd.post(b.owner, b.give, b.want));
-      if (op === 'claim') return json(await bd.claim(b.id, b.claimer, b.give));
-      if (op === 'cancel') return json(await bd.cancel(b.id, b.ownerId));
-      if (op === 'collect') return json(await bd.collect(b.id, b.ownerId));
+      switch (url.pathname.slice('/trade/'.length)) {
+        case 'post': return json(await bd.post(b.owner, b.give, b.want));
+        case 'offer': return json(await bd.offer(b.listingId, b.bidder, b.give));
+        case 'accept': return json(await bd.accept(b.listingId, b.ownerId, b.offerId));
+        case 'decline': return json(await bd.decline(b.listingId, b.ownerId, b.offerId));
+        case 'cancel': return json(await bd.cancel(b.listingId, b.ownerId));
+        case 'withdraw': return json(await bd.withdraw(b.offerId, b.bidderId));
+        case 'collect': return json(await bd.collect(b.offerId, b.bidderId));
+        case 'mine-listings': return json(await bd.myListings(b.ownerId));
+        case 'mine-offers': return json(await bd.myOffers(b.bidderId));
+      }
       return json({ error: 'bad op' }, 400);
-    }
-    if (request.method === 'POST' && url.pathname === '/trade-mine') {
-      let b; try { b = await request.json(); } catch (e) { return json({ error: 'bad json' }, 400); }
-      return json(await board(env).mine(b && b.ownerId));
     }
 
     return json({ error: 'not found' }, 404);
