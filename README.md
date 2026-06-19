@@ -36,6 +36,10 @@ with **no backend required**, hosted on GitHub Pages.
   (from the Collection's 🔥 Fuse button). Rarity values are ~3× per tier, so it's
   roughly value-neutral — a way to shrink a bloated collection and climb tiers at
   once. Bulk-fuse many at a time.
+- **"NEW" badges** — the first time you obtain a species you've never discovered,
+  it's flagged **NEW**: a ribbon on the hatch/fusion reveal, a green NEW corner
+  badge on its card in the Collection, and a count on the Collection tab. The
+  badge clears once you tap the creature to view its details.
 - **Critterdex view** in the Collection (Owned ⇄ Critterdex toggle): every
   species shown as a card — owned in full colour with counts, undiscovered as
   "???" silhouettes, and prestige-locked rarities as 🔒 silhouettes so you can

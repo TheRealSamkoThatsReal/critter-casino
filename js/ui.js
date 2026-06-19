@@ -70,6 +70,7 @@
     if (opts.showValue !== false && !opts.silhouette)
       c.appendChild(el('div', { class: 'cvalue', html: '✨ ' + fmt(G.state.valueOf(item)) }));
     if (opts.badge) c.appendChild(el('div', { class: 'cbadge', text: opts.badge }));
+    if (!opts.silhouette && G.state.isNew && G.state.isNew(item.sid)) c.appendChild(el('div', { class: 'cnew', text: 'NEW' }));
     if (opts.onClick) {
       c.classList.add('clickable');
       c.addEventListener('click', function () { haptic(12); opts.onClick(item, c); });
@@ -123,6 +124,7 @@
       big.appendChild(G.sprites.el(sp, 140));
       node.appendChild(big);
       node.appendChild(el('div', { class: 'reveal-name', text: (item.shiny ? '✨ Shiny ' : '') + sp.name }));
+      if (G.state.isNew && G.state.isNew(item.sid)) node.appendChild(el('div', { class: 'reveal-new', text: '✦ NEW DISCOVERY' }));
       node.appendChild(el('div', { class: 'reveal-rarity', text: r.name + ' • ✨ ' + fmt(G.state.valueOf(item)) }));
       if (G.fx) G.fx.celebrate(sp.tier);
       return modal('', node);

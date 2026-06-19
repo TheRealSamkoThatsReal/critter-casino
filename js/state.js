@@ -14,6 +14,7 @@
     lastFed: 0,         // timestamp creatures were last fed (hunger/starvation)
     lastDeathRoll: 0,   // high-water mark for hourly starvation death rolls
     discovered: {},     // Critterdex: every species id ever owned (persists across sell/gamble)
+    newSpecies: {},     // species discovered but not yet viewed (shows a NEW badge)
     prestige: 0,        // number of times prestiged (permanent income multiplier)
     stats: { hatched: 0, gambled: 0, wins: 0, losses: 0, traded: 0 },
     adminPass: 'admin',
@@ -32,6 +33,7 @@
       const s = Object.assign(JSON.parse(JSON.stringify(def)), JSON.parse(raw));
       if (!s.player.id) s.player.id = genId();
       if (!s.discovered) s.discovered = {};
+      if (!s.newSpecies) s.newSpecies = {};
       // migrate: credit anything currently owned to the Critterdex
       (s.inv || []).forEach(function (it) { s.discovered[it.sid] = 1; });
       // existing players start well-fed so this update doesn't starve them
@@ -136,7 +138,14 @@
   }
 
   // Critterdex: remember every species ever owned
-  function discover(sid) { if (sid) state.discovered[sid] = 1; }
+  // first-ever acquisition of a species marks it NEW (until viewed)
+  function discover(sid) {
+    if (!sid) return;
+    if (!state.discovered[sid]) { state.discovered[sid] = 1; state.newSpecies[sid] = 1; }
+  }
+  function isNew(sid) { return !!(state.newSpecies && state.newSpecies[sid]); }
+  function markSeen(sid) { if (state.newSpecies && state.newSpecies[sid]) { delete state.newSpecies[sid]; save(); } }
+  function newCount() { return state.newSpecies ? Object.keys(state.newSpecies).length : 0; }
 
   // inventory ops
   function addSpecies(sid, shiny) {
@@ -202,6 +211,7 @@
     state.upgrades = {};
     state.cooldowns = {};
     state.discovered = {};
+    state.newSpecies = {};
     state.lastTick = Date.now();
     state.lastFed = Date.now();
     state.lastDeathRoll = 0;
@@ -227,6 +237,7 @@
     addInstance: addInstance,
     removeInstance: removeInstance,
     getInstance: getInstance,
+    isNew: isNew, markSeen: markSeen, newCount: newCount,
     addCoins: addCoins,
     dexProgress: dexProgress,
     canPrestige: canPrestige,
