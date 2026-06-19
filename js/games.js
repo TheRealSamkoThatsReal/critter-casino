@@ -194,12 +194,14 @@
       segMid.push((start + end) / 2);
     });
     wheel.style.background = 'conic-gradient(' + stops.join(',') + ')';
+    const labelEls = [];
     WHEEL.forEach(function (s, i) {
       const lab = el('div', { class: 'wlabel', text: s.label });
-      lab.style.transform = 'rotate(' + segMid[i] + 'deg) translateY(-72px)';
-      wheel.appendChild(lab);
+      lab.style.transform = 'rotate(' + segMid[i] + 'deg) translateY(-76px)';
+      wheel.appendChild(lab); labelEls.push(lab);
     });
-    const inner = el('div', { class: 'wheel-wrap' }, [wheel, el('div', { class: 'wheel-ptr', text: '▼' })]);
+    const ptr = el('div', { class: 'wheel-ptr', text: '▼' });
+    const inner = el('div', { class: 'wheel-wrap' }, [wheel, ptr, el('div', { class: 'wheel-hub' })]);
     stage.appendChild(inner);
     wrap.appendChild(stage);
     const action = el('div', { class: 'gaction' });
@@ -209,6 +211,7 @@
     let rot = 0;
     spinBtn.addEventListener('click', function () {
       G.ui.haptic(18); spinBtn.disabled = true;
+      ptr.classList.add('ticking');
       let r = Math.random() * total, idx = 0;
       for (let i = 0; i < WHEEL.length; i++) { r -= WHEEL[i].w; if (r <= 0) { idx = i; break; } }
       const targetDeg = 360 - segMid[idx] + (5 * 360);
@@ -216,6 +219,10 @@
       wheel.style.transition = 'transform 3.4s cubic-bezier(.17,.67,.2,1)';
       wheel.style.transform = 'rotate(' + rot + 'deg)';
       setTimeout(function () {
+        ptr.classList.remove('ticking');
+        wheel.classList.add('landed');
+        if (labelEls[idx]) labelEls[idx].classList.add('win');
+        G.ui.haptic([20, 40]);
         const res = resolve(wager, WHEEL[idx].mult);
         showResult(res, action, function () { m.close(); wheelGame2(); });
       }, 3500);
@@ -248,19 +255,27 @@
       else if (roll < 0.08) { cat = 'three'; mult = 3; const s = pick(SYMS); final = [s, s, s]; }
       else if (roll < 0.46) { cat = 'two'; mult = 1.5; const s = pick(SYMS); let o = pick(ALL); while (o === s) o = pick(ALL); final = pick([[s, s, o], [s, o, s], [o, s, s]]); }
       else { cat = 'none'; mult = 0; const a = pick(ALL); let b = pick(ALL); while (b === a) b = pick(ALL); let c = pick(ALL); while (c === a || c === b) c = pick(ALL); final = [a, b, c]; }
-      let spins = 0;
-      const iv = setInterval(function () {
-        cells.forEach(function (c) { c.textContent = pick(ALL); });
-        spins++;
-        if (spins > 14) {
-          clearInterval(iv);
-          cells.forEach(function (c, i) { c.textContent = final[i]; c.classList.add('settle'); });
-          setTimeout(function () {
-            const res = resolve(wager, mult);
-            showResult(res, action, function () { m.close(); slots2(); });
-          }, 500);
-        }
-      }, 90);
+      // reels spin then lock one-by-one (left → right) for anticipation
+      const stopAt = [700, 1050, 1450];
+      const ivs = cells.map(function (c) { c.classList.add('spin'); return setInterval(function () { c.textContent = pick(ALL); }, 70); });
+      cells.forEach(function (c, i) {
+        setTimeout(function () {
+          clearInterval(ivs[i]);
+          c.textContent = final[i];
+          c.classList.remove('spin'); c.classList.add('settle');
+          G.ui.haptic(22);
+          if (i === cells.length - 1) {
+            if (mult > 0) { // glow the matched symbols
+              const counts = {}; final.forEach(function (sy) { counts[sy] = (counts[sy] || 0) + 1; });
+              cells.forEach(function (cc, j) { if (counts[final[j]] >= 2) cc.classList.add('match'); });
+            }
+            setTimeout(function () {
+              const res = resolve(wager, mult);
+              showResult(res, action, function () { m.close(); slots2(); });
+            }, mult > 0 ? 800 : 450);
+          }
+        }, stopAt[i]);
+      });
     });
   }
   function slots2() { chooseWager(slots); }
@@ -284,21 +299,22 @@
     const m = G.ui.modal('High Roll', wrap);
     btn.addEventListener('click', function () {
       G.ui.haptic(18); btn.disabled = true;
-      let spins = 0;
       const a = 1 + Math.floor(Math.random() * 6), b = 1 + Math.floor(Math.random() * 6);
-      const iv = setInterval(function () {
-        d1.textContent = pick(faces); d2.textContent = pick(faces); spins++;
-        if (spins > 12) {
-          clearInterval(iv);
-          d1.textContent = faces[a - 1]; d2.textContent = faces[b - 1];
-          const sum = a + b;
-          const mult = sum === 12 ? 4 : sum >= 10 ? 2.5 : sum >= 7 ? 1.5 : 0;
-          setTimeout(function () {
-            const res = resolve(wager, mult);
-            showResult(res, action, function () { m.close(); dice2(); });
-          }, 500);
-        }
-      }, 90);
+      d1.classList.add('rolling'); d2.classList.add('rolling');
+      const iv = setInterval(function () { d1.textContent = pick(faces); d2.textContent = pick(faces); }, 80);
+      setTimeout(function () {
+        clearInterval(iv);
+        d1.textContent = faces[a - 1]; d2.textContent = faces[b - 1];
+        d1.classList.remove('rolling'); d2.classList.remove('rolling');
+        d1.classList.add('land'); d2.classList.add('land');
+        G.ui.haptic([20, 40]);
+        const sum = a + b;
+        const mult = sum === 12 ? 4 : sum >= 10 ? 2.5 : sum >= 7 ? 1.5 : 0;
+        setTimeout(function () {
+          const res = resolve(wager, mult);
+          showResult(res, action, function () { m.close(); dice2(); });
+        }, 550);
+      }, 1200);
     });
   }
   function dice2() { chooseWager(dice); }
