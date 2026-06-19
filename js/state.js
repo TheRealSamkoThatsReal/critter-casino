@@ -16,6 +16,7 @@
     discovered: {},     // Critterdex: every species id ever owned (persists across sell/gamble)
     prestige: 0,        // number of times prestiged (permanent income multiplier)
     stats: { hatched: 0, gambled: 0, wins: 0, losses: 0, traded: 0 },
+    adminPass: 'admin',
     seenAdmin: false
   };
 
@@ -35,6 +36,7 @@
       (s.inv || []).forEach(function (it) { s.discovered[it.sid] = 1; });
       // existing players start well-fed so this update doesn't starve them
       if (!s.lastFed) s.lastFed = Date.now();
+      if (!s.adminPass) s.adminPass = 'admin';
       return s;
     } catch (e) {
       return seed(JSON.parse(JSON.stringify(def)));

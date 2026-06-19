@@ -4,7 +4,7 @@
 (function (G) {
   'use strict';
   const el = G.ui.el, toast = G.ui.toast;
-  const PASS = 'admin';
+  function pass() { return G.state.get().adminPass || 'admin'; }
   let unlocked = false;
 
   function previewSprite(species, size) {
@@ -242,6 +242,26 @@
     update();
   }
 
+  function passcodePanel(container) {
+    const np = el('input', { class: 'a-input', type: 'password', placeholder: 'New passcode' });
+    const cp = el('input', { class: 'a-input', type: 'password', placeholder: 'Confirm passcode' });
+    container.appendChild(el('div', { class: 'panel' }, [
+      el('h3', { text: '🔑 Admin Passcode' }),
+      el('div', { class: 'a-fields' }, [
+        el('label', { text: 'New passcode' }), np,
+        el('label', { text: 'Confirm' }), cp
+      ]),
+      el('button', { class: 'btn primary', text: 'Change passcode', onclick: function () {
+        const a = np.value, b = cp.value;
+        if (!a) { toast('Enter a new passcode.', 'bad'); return; }
+        if (a !== b) { toast('Passcodes don\'t match.', 'bad'); return; }
+        G.state.get().adminPass = a; G.state.save();
+        np.value = ''; cp.value = '';
+        toast('Admin passcode changed.', 'good');
+      } })
+    ]));
+  }
+
   function dangerPanel(container) {
     const coinsInp = el('input', { class: 'a-input', type: 'number', value: G.state.get().coins });
     container.appendChild(el('div', { class: 'panel' }, [
@@ -265,13 +285,13 @@
   function gate(container) {
     const inp = el('input', { class: 'a-input', type: 'password', placeholder: 'Admin passcode' });
     const go = function () {
-      if (inp.value === PASS) { unlocked = true; render(container); }
+      if (inp.value === pass()) { unlocked = true; render(container); }
       else toast('Wrong passcode.', 'bad');
     };
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
     container.appendChild(el('div', { class: 'panel gate' }, [
       el('h3', { text: '🔒 Admin' }),
-      el('p', { class: 'gdesc', text: 'Enter the admin passcode. (Default: "admin")' }),
+      el('p', { class: 'gdesc', text: 'Enter the admin passcode.' }),
       inp,
       el('button', { class: 'btn primary', text: 'Unlock', onclick: go })
     ]));
@@ -284,6 +304,7 @@
     addForm(container);
     customList(container);
     grantPanel(container);
+    passcodePanel(container);
     dangerPanel(container);
   }
 

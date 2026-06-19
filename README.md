@@ -56,8 +56,9 @@ with **no backend required**, hosted on GitHub Pages.
   - Pool a pile of commons for a real shot at an Epic, Mythic, or Divine.
 - **Player-to-player trading** via shareable codes (offer → accept → complete),
   with escrow and reclaim — no servers or accounts.
-- **Admin panel** (passcode: `admin`) to design and add new creatures with a
-  live sprite preview, grant creatures, and manage the game.
+- **Hidden admin panel** to design and add creatures (live sprite preview +
+  pixel editor), grant creatures, change the admin passcode, and manage the
+  game. The Admin tab is hidden until you do the secret knock (see below).
 - **PWA**: installable to your home screen and works offline via a service
   worker. Designed mobile-first with a bottom nav and safe-area support.
 
@@ -79,5 +80,8 @@ python3 -m http.server 8000
 
 ## Admin
 
-Tap the **Admin** tab and enter the passcode `admin`. Because this is a
-purely client-side app, the passcode is only a soft gate, not real security.
+The Admin tab is hidden by default. To reveal it, **tap the 🔊/🔇 mute button
+in the top bar six times quickly** (toggle it on/off three times). Then open the
+Admin tab and enter the passcode (default `admin` on a fresh save — change it in
+the panel's "Admin Passcode" section). Because this is a purely client-side app,
+the passcode is only a soft gate, not real security.

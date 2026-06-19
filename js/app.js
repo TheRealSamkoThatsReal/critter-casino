@@ -268,7 +268,7 @@
   };
 
   function navOrder() {
-    return G.ui.$$('.navbtn').map(function (b) { return b.dataset.view; });
+    return G.ui.$$('.navbtn').filter(function (b) { return !b.hidden; }).map(function (b) { return b.dataset.view; });
   }
 
   function navigate(view) {
@@ -411,12 +411,23 @@
     G.idle.init(); // start passive income + offline earnings
     G.fx.init();   // arm audio on first gesture
 
-    // sound mute toggle
+    // sound mute toggle (+ secret knock: toggle on/off 3 times to reveal Admin)
     const muteBtn = document.getElementById('mute');
     if (muteBtn) {
       const sync = function () { muteBtn.textContent = G.fx.isMuted() ? '🔇' : '🔊'; };
       sync();
-      muteBtn.addEventListener('click', function () { G.fx.toggleMute(); sync(); });
+      let knock = 0, knockAt = 0;
+      muteBtn.addEventListener('click', function () {
+        G.fx.toggleMute(); sync();
+        const now = Date.now();
+        knock = (now - knockAt < 1500) ? knock + 1 : 1; // must be in quick succession
+        knockAt = now;
+        const adminBtn = document.querySelector('.navbtn[data-view="admin"]');
+        if (knock >= 6 && adminBtn && adminBtn.hidden) {
+          adminBtn.hidden = false; knock = 0;
+          G.ui.toast('🛠 Admin panel unlocked.', 'good');
+        }
+      });
     }
 
     // daily reminder (push) toggle
