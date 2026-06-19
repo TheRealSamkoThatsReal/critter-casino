@@ -115,6 +115,8 @@ body {
   --glow: transparent; --rcolor: #9aa3b2;
   border-top: 2px solid var(--rcolor);
 }
+/* skip rendering offscreen cards in long grids (big perf win when selecting many) */
+.card { content-visibility: auto; contain-intrinsic-size: 0 116px; }
 .card.clickable { cursor: pointer; transition: transform .1s, box-shadow .15s; }
 .card.clickable:active { transform: scale(.95); }
 .card.selected { transform: scale(.95); }

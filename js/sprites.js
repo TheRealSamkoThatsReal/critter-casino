@@ -231,8 +231,36 @@
     return c;
   }
 
+  // Each species' sprite is drawn ONCE to a data URL and reused. This keeps big
+  // grids (e.g. the wager picker with hundreds of creatures) cheap — an <img>
+  // sharing a cached, already-decoded bitmap instead of a fresh 196-fillRect
+  // canvas per card.
+  const urlCache = {};
+  const BASE = 84; // single cached resolution; CSS scales it (pixelated)
+  function dataURL(creature) {
+    const key = (creature.id || creature.spriteSeed || 'x') + (creature.pixels ? '|' + creature.pixels.join('') : '');
+    if (urlCache[key]) return urlCache[key];
+    const c = document.createElement('canvas');
+    draw(c, creature, BASE);
+    let u = null;
+    try { u = c.toDataURL(); } catch (e) {}
+    if (u) urlCache[key] = u;
+    return u;
+  }
+  // Lightweight cached sprite as an <img>; preferred for list/grid cards.
+  function imgEl(creature, px) {
+    const im = new Image();
+    im.className = 'sprite';
+    im.decoding = 'async';
+    im.style.width = px + 'px';
+    im.style.height = px + 'px';
+    const u = dataURL(creature);
+    if (u) im.src = u;
+    return im;
+  }
+
   G.sprites = {
-    draw: draw, el: el, data: spriteData, SIZE: SIZE, hashStr: hashStr,
+    draw: draw, el: el, imgEl: imgEl, data: spriteData, SIZE: SIZE, hashStr: hashStr,
     palette: paletteOf, keyColor: colorFor,
     generatedGrid: generatedGrid, gridToPixels: gridToPixels, pixelsToGrid: pixelsToGrid
   };

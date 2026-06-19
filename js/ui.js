@@ -60,7 +60,7 @@
     c.style.setProperty('--glow', r.glow === 'none' ? 'transparent' : r.glow);
     c.style.setProperty('--rcolor', r.color);
     const spr = el('div', { class: 'spritebox' });
-    const sprCanvas = G.sprites.el(sp, size);
+    const sprCanvas = G.sprites.imgEl(sp, size); // cached <img>, cheap for big grids
     if (opts.silhouette) sprCanvas.classList.add('silhouette');
     spr.appendChild(sprCanvas);
     if (item.shiny && !opts.silhouette) spr.appendChild(el('div', { class: 'shiny-star', text: '★' }));
