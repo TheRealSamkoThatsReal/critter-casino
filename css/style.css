@@ -176,6 +176,8 @@ body {
 .coll-stats .stat b { display: block; font-size: 16px; }
 .coll-stats .stat span { font-size: 11px; color: var(--muted); }
 .controls { display: flex; gap: 8px; margin-bottom: 12px; }
+.fuse-bar { margin-bottom: 12px; }
+.fuse-bar .btn { width: 100%; }
 .ctrl, .a-input, .tname {
   background: var(--panel); color: var(--ink); border: 1px solid var(--line);
   border-radius: 10px; padding: 9px 10px; font-size: 14px; flex: 1; min-width: 0;

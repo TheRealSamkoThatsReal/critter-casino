@@ -158,6 +158,10 @@
 
     if (collMode === 'dex') { renderDexGrid(container); return; }
 
+    container.appendChild(el('div', { class: 'fuse-bar' }, [
+      el('button', { class: 'btn small', text: '🔥 Fuse creatures', onclick: openFuse })
+    ]));
+
     let items = s.inv.slice();
     if (collFilter !== 'all') items = items.filter(function (it) {
       const sp = G.state.getSpecies(it.sid); return sp && sp.tier === parseInt(collFilter, 10);
@@ -237,7 +241,74 @@
     refreshAll();
   }
 
-  function hatchSummary(results) {
+  // ---- fusion: 3 of a rarity -> 1 of the next (shrinks the collection) -----
+  function fuseRarityOptions() {
+    const s = G.state.get(), cap = G.state.maxTierUnlocked(), counts = {};
+    s.inv.forEach(function (it) { const sp = G.state.getSpecies(it.sid); if (sp) counts[sp.tier] = (counts[sp.tier] || 0) + 1; });
+    const opts = [];
+    G.data.RARITIES.forEach(function (r) { if (r.tier + 1 <= cap && (counts[r.tier] || 0) >= 3) opts.push(r.tier); });
+    return opts;
+  }
+
+  function openFuse() {
+    const opts = fuseRarityOptions();
+    if (!opts.length) { toast('Need 3+ of one rarity (below your top tier) to fuse.', 'bad'); return; }
+    const wrap = el('div', {});
+    wrap.appendChild(el('p', { class: 'gdesc', text:
+      'Fuse 3 creatures of one rarity into 1 of the next rarity up — same total value, fewer creatures.' }));
+    const tierSel = el('select', { class: 'ctrl' });
+    opts.forEach(function (t) { tierSel.appendChild(el('option', { value: t, text: G.data.rarity(t).name + ' → ' + G.data.rarity(t + 1).name })); });
+    wrap.appendChild(el('div', { class: 'controls' }, [tierSel]));
+    const info = el('div', { class: 'wager-total' });
+    const tools = el('div', { class: 'wager-tools' });
+    const grid = el('div', { class: 'grid pick-grid' });
+    wrap.appendChild(info); wrap.appendChild(tools); wrap.appendChild(grid);
+    const goBtn = el('button', { class: 'btn primary' });
+    const m = G.ui.modal('🔥 Fuse', wrap, { footer: goBtn });
+    let tier = opts[0], selected = {}, cardByIid = {};
+
+    function update() {
+      const n = Object.keys(selected).length, groups = Math.floor(n / 3);
+      info.innerHTML = 'Selected <b>' + n + '</b> · fuse into <b>' + groups + ' ' + G.data.rarity(tier + 1).name + '</b>';
+      goBtn.disabled = groups < 1;
+      goBtn.textContent = groups < 1 ? 'Select 3+' : ('🔥 Fuse ×' + groups);
+    }
+    function rebuild() {
+      selected = {}; cardByIid = {}; grid.innerHTML = ''; tools.innerHTML = '';
+      const list = G.state.get().inv.filter(function (it) { const sp = G.state.getSpecies(it.sid); return sp && sp.tier === tier; })
+        .sort(function (a, b) { return (a.shiny ? 1 : 0) - (b.shiny ? 1 : 0); }); // non-shiny first
+      function setSel(it, on) { if (on) selected[it.iid] = it; else delete selected[it.iid]; if (cardByIid[it.iid]) cardByIid[it.iid].classList.toggle('selected', on); }
+      list.forEach(function (it) { const c = G.ui.card(it, { size: 50, onClick: function () { setSel(it, !selected[it.iid]); update(); } }); cardByIid[it.iid] = c; grid.appendChild(c); });
+      function add(k) { let added = 0; for (let i = 0; i < list.length && added < k; i++) { if (!selected[list[i].iid]) { setSel(list[i], true); added++; } } update(); }
+      tools.appendChild(el('button', { class: 'btn small', text: '+3', onclick: function () { add(3); } }));
+      tools.appendChild(el('button', { class: 'btn small', text: 'All', onclick: function () { add(list.length); } }));
+      tools.appendChild(el('button', { class: 'btn small', text: 'Clear', onclick: function () { Object.keys(selected).forEach(function (k) { if (cardByIid[k]) cardByIid[k].classList.remove('selected'); }); selected = {}; update(); } }));
+      update();
+    }
+    tierSel.addEventListener('change', function () { tier = parseInt(tierSel.value, 10); rebuild(); });
+    rebuild();
+
+    goBtn.addEventListener('click', function () {
+      const items = Object.keys(selected).map(function (k) { return selected[k]; });
+      const groups = Math.floor(items.length / 3);
+      if (groups < 1) return;
+      const results = [];
+      for (let i = 0; i < groups; i++) {
+        const trio = items.slice(i * 3, i * 3 + 3);
+        const allShiny = trio.every(function (it) { return it.shiny; });
+        trio.forEach(function (it) { G.state.removeInstance(it.iid); });
+        const sp = G.state.randomSpeciesAtTier(tier + 1);
+        if (sp) results.push(G.state.addSpecies(sp.id, allShiny || Math.random() < 0.03));
+      }
+      G.state.save();
+      G.ui.haptic([20, 30, 60]);
+      m.close();
+      if (window.refreshAll) window.refreshAll();
+      if (results.length) hatchSummary(results, '🔥 Fused into ' + results.length + '!');
+    });
+  }
+
+  function hatchSummary(results, headline) {
     if (!results.length) return;
     let bestTier = 0;
     results.forEach(function (it) { const sp = G.state.getSpecies(it.sid); if (sp && sp.tier > bestTier) bestTier = sp.tier; });
@@ -260,7 +331,7 @@
     const canvas = el('canvas', { class: 'fx-rays' });
     node.appendChild(canvas);
     const content = el('div', { class: 'summary-content' });
-    content.appendChild(el('div', { class: 'reveal-head', text: 'Hatched ×' + results.length + '!' }));
+    content.appendChild(el('div', { class: 'reveal-head', text: headline || ('Hatched ×' + results.length + '!') }));
     const grid = el('div', { class: 'grid pick-grid' });
     arr.forEach(function (g, i) {
       const card = G.ui.card(g.item, { size: 56, showValue: false, badge: g.count > 1 ? ('×' + g.count) : null });

@@ -32,6 +32,10 @@ with **no backend required**, hosted on GitHub Pages.
   results summary, to spend coins fast. A free **Daily Egg** gives a creature
   from any unlocked rarity, favouring species you haven't collected yet (so it
   steadily fills your dex).
+- **Fusion** — combine **3 creatures of one rarity into 1 of the next rarity up**
+  (from the Collection's 🔥 Fuse button). Rarity values are ~3× per tier, so it's
+  roughly value-neutral — a way to shrink a bloated collection and climb tiers at
+  once. Bulk-fuse many at a time.
 - **Critterdex view** in the Collection (Owned ⇄ Critterdex toggle): every
   species shown as a card — owned in full colour with counts, undiscovered as
   "???" silhouettes, and prestige-locked rarities as 🔒 silhouettes so you can
