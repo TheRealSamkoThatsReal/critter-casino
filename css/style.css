@@ -39,12 +39,13 @@ body {
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
 }
-.brand { font-weight: 800; font-size: 17px; letter-spacing: .3px; }
+.brand { font-weight: 800; font-size: 17px; letter-spacing: .3px;
+  min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .brand span { background: linear-gradient(90deg, #ff4d8d, #6c5cff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.topbar-right { display: flex; align-items: center; gap: 8px; }
+.topbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .coinbox {
   background: linear-gradient(180deg, #3a2f12, #2a2410);
-  color: #ffd75e; font-weight: 800; font-size: 14px;
+  color: #ffd75e; font-weight: 800; font-size: 14px; white-space: nowrap; flex-shrink: 0;
   padding: 6px 11px; border-radius: 999px; border: 1px solid #5a4a14;
 }
 .install-btn {
@@ -455,7 +456,7 @@ body {
 .prestige-badge {
   background: linear-gradient(180deg, #3a2a5e, #2a1e4a); color: #ffe14d; font-weight: 800; font-size: 13px;
   padding: 6px 10px; border-radius: 999px; border: 1px solid #6c5cff;
-  box-shadow: 0 0 10px -2px #6c5cff;
+  box-shadow: 0 0 10px -2px #6c5cff; white-space: nowrap; flex-shrink: 0;
 }
 .prestige-card {
   background: linear-gradient(135deg, #2a1e4a, #1b1830); border: 1px solid #4a3f7a; border-radius: 16px;
