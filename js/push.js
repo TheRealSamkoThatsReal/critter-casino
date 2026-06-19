@@ -7,7 +7,7 @@
   // Public VAPID key — must match server/wrangler.toml VAPID_PUBLIC.
   const VAPID_PUBLIC_KEY = 'BIib9JSjizYPUcIlyTTCIKNXUT20TSgGEMG4VMMZqCIW_JvrdPYFw-rlKIK7ZAv1DrGnlLfnsTT8eUG-PI_dpRg';
   // Set this to your Worker URL after deploying (see server/SETUP.md). No trailing slash.
-  const PUSH_BASE = '';
+  const PUSH_BASE = 'https://critter-casino-push.sam-kouse.workers.dev';
 
   function supported() {
     return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -88,6 +88,18 @@
     } catch (e) {}
   }
 
+  // Ask the server to send a test push to this device right now.
+  async function sendTest() {
+    if (!configured()) throw new Error('unconfigured');
+    const sub = await currentSub();
+    if (!sub) throw new Error('not subscribed');
+    const r = await fetch(PUSH_BASE + '/test', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: sub.toJSON() })
+    });
+    return r.ok;
+  }
+
   // Called on launch: refresh the server's record (updates last-active day +
   // reminder hour) so today's reminder is suppressed.
   async function heartbeat() {
@@ -99,6 +111,6 @@
     supported: supported, configured: configured, permission: permission,
     isStandalone: isStandalone, isIOS: isIOS,
     isEnabled: isEnabled, enable: enable, disable: disable, heartbeat: heartbeat,
-    getHour: getHour, setHour: setHour
+    sendTest: sendTest, getHour: getHour, setHour: setHour
   };
 })(window.G = window.G || {});

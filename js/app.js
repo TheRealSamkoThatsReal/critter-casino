@@ -272,14 +272,24 @@
 
     const status = el('div', { class: 'gsub' });
     const btn = el('button', { class: 'btn primary big' });
-    wrap.appendChild(el('div', { class: 'gaction' }, [btn, status]));
+    const testBtn = el('button', { class: 'btn', text: '✉️ Send test notification', hidden: 'hidden' });
+    wrap.appendChild(el('div', { class: 'gaction' }, [btn, testBtn, status]));
     const m = G.ui.modal('🔔 Daily Reminders', wrap);
+
+    testBtn.addEventListener('click', function () {
+      testBtn.disabled = true;
+      Promise.resolve(G.push.sendTest()).then(function (ok) {
+        toast(ok ? 'Test sent — check your notifications!' : 'Test failed to send.', ok ? 'good' : 'bad');
+      }).catch(function () { toast('Test failed to send.', 'bad'); })
+        .then(function () { testBtn.disabled = false; });
+    });
 
     function refresh() {
       G.push.isEnabled().then(function (on) {
         btn.textContent = on ? '🔕 Turn off reminders' : '🔔 Turn on reminders';
         status.textContent = on ? ('On — daily at ' + hourLabel(G.push.getHour())) :
           (G.push.permission() === 'denied' ? 'Notifications are blocked in your browser settings.' : 'Off');
+        testBtn.hidden = !on;
       });
     }
     refresh();

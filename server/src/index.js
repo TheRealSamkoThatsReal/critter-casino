@@ -56,6 +56,23 @@ export default {
       return json({ ok: true });
     }
 
+    if (request.method === 'POST' && url.pathname === '/test') {
+      let b;
+      try { b = await request.json(); } catch (e) { return json({ error: 'bad json' }, 400); }
+      const sub = b && b.subscription;
+      if (!sub || !sub.endpoint || !sub.keys) return json({ error: 'invalid subscription' }, 400);
+      try {
+        const res = await sendPush(sub, {
+          title: 'Critter Casino 🎲',
+          body: 'Test notification — reminders are working! 🐾',
+          url: './'
+        }, env);
+        return json({ ok: res.status >= 200 && res.status < 300, status: res.status });
+      } catch (e) {
+        return json({ error: String(e && e.message || e) }, 500);
+      }
+    }
+
     if (request.method === 'POST' && url.pathname === '/unsubscribe') {
       let b;
       try { b = await request.json(); } catch (e) { return json({ error: 'bad json' }, 400); }
