@@ -115,6 +115,17 @@
     return pool[pool.length - 1].s;
   }
 
+  // daily egg: a random species from any unlocked tier, preferring one not yet
+  // in the Critterdex (helps complete the collection toward prestige).
+  function dailyPick() {
+    const cap = maxTierUnlocked();
+    const cands = allSpecies().filter(function (s) { return s.tier <= cap; });
+    if (!cands.length) return null;
+    const fresh = cands.filter(function (s) { return !state.discovered[s.id]; });
+    const pool = fresh.length ? fresh : cands;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
   // pick a random species at exactly a tier (for upgrades)
   function randomSpeciesAtTier(tier) {
     const opts = speciesByTier(tier);
@@ -206,6 +217,7 @@
     valueOf: valueOf,
     randomSpecies: randomSpecies,
     randomSpeciesAtTier: randomSpeciesAtTier,
+    dailyPick: dailyPick,
     addSpecies: addSpecies,
     addInstance: addInstance,
     removeInstance: removeInstance,

@@ -4,7 +4,7 @@
   const el = G.ui.el, toast = G.ui.toast, fmt = G.ui.fmt;
 
   let current = 'collection';
-  let collFilter = 'all', collSort = 'rarity';
+  let collFilter = 'all', collSort = 'rarity', collMode = 'owned';
 
   // ---- header --------------------------------------------------------------
   function renderHeader() {
@@ -52,31 +52,111 @@
     ]));
   }
 
+  function stat(b, span) { return el('div', { class: 'stat' }, [el('b', { text: b }), el('span', { text: span })]); }
+
+  function dexCounts() {
+    const s = G.state.get(), cap = G.state.maxTierUnlocked();
+    let have = 0, total = 0, locked = 0;
+    G.state.allSpecies().forEach(function (sp) {
+      if (sp.tier > cap) { locked++; return; }
+      total++; if (s.discovered[sp.id]) have++;
+    });
+    return { have: have, total: total, locked: locked };
+  }
+
+  // read-only species detail (Critterdex)
+  function speciesDetail(sp) {
+    const r = G.data.rarity(sp.tier);
+    const node = el('div', { class: 'detail' });
+    const big = el('div', { class: 'detail-sprite r' + sp.tier });
+    big.style.setProperty('--rcolor', r.color);
+    big.appendChild(G.sprites.el(sp, 150));
+    node.appendChild(big);
+    node.appendChild(el('div', { class: 'detail-name', text: sp.name }));
+    node.appendChild(el('div', { class: 'detail-meta', html:
+      '<span class="pill r' + sp.tier + '">' + r.name + '</span> ' +
+      '<span class="pill">' + sp.element + '</span> ' +
+      '<span class="pill">⛁ ' + fmt(r.value) + '</span>' }));
+    const owned = G.state.get().inv.filter(function (it) { return it.sid === sp.id; }).length;
+    node.appendChild(el('div', { class: 'gsub', text: owned ? ('You own ' + owned) : 'Discovered — not currently owned' }));
+    G.ui.modal(sp.name, node);
+  }
+
+  function renderDexGrid(container) {
+    const s = G.state.get(), cap = G.state.maxTierUnlocked();
+    let species = G.state.allSpecies().slice();
+    if (collFilter !== 'all') species = species.filter(function (sp) { return sp.tier === parseInt(collFilter, 10); });
+    species.sort(function (a, b) { return (a.tier - b.tier) || a.name.localeCompare(b.name); });
+    if (!species.length) { container.appendChild(el('div', { class: 'empty', text: 'Nothing here.' })); return; }
+    const counts = {};
+    s.inv.forEach(function (it) { counts[it.sid] = (counts[it.sid] || 0) + 1; });
+    const grid = el('div', { class: 'grid coll-grid' });
+    species.forEach(function (sp) {
+      const proxy = { iid: 'dex', sid: sp.id, shiny: false };
+      if (sp.tier > cap) {
+        grid.appendChild(G.ui.card(proxy, { size: 64, silhouette: true, badge: '🔒P' + (sp.tier - G.data.PRESTIGE_MAX_TIER),
+          onClick: function () { toast('🔒 Unlocks at Prestige ' + (sp.tier - G.data.PRESTIGE_MAX_TIER), ''); } }));
+      } else if (!s.discovered[sp.id]) {
+        grid.appendChild(G.ui.card(proxy, { size: 64, silhouette: true,
+          onClick: function () { toast('❔ Not discovered yet — keep hatching!', ''); } }));
+      } else {
+        grid.appendChild(G.ui.card(proxy, { size: 64, showValue: false,
+          badge: counts[sp.id] ? ('×' + counts[sp.id]) : null,
+          onClick: function () { speciesDetail(sp); } }));
+      }
+    });
+    container.appendChild(grid);
+  }
+
   function renderCollection(container) {
     const s = G.state.get();
     container.innerHTML = '';
     container.appendChild(el('h2', { class: 'view-title', text: '📦 Collection' }));
-    const uniq = {};
-    s.inv.forEach(function (it) { uniq[it.sid] = 1; });
-    container.appendChild(el('div', { class: 'coll-stats' }, [
-      el('div', { class: 'stat' }, [el('b', { text: String(s.inv.length) }), el('span', { text: 'creatures' })]),
-      el('div', { class: 'stat' }, [el('b', { text: '⛁ ' + fmt(collectionValue()) }), el('span', { text: 'total value' })]),
-      el('div', { class: 'stat' }, [el('b', { text: Object.keys(uniq).length + '/' + G.state.allSpecies().length }), el('span', { text: 'species' })])
-    ]));
 
-    // controls
+    // Owned | Critterdex toggle
+    const seg = el('div', { class: 'seg' });
+    [['owned', 'Owned'], ['dex', 'Critterdex']].forEach(function (o) {
+      seg.appendChild(el('button', { class: 'seg-btn' + (collMode === o[0] ? ' active' : ''), text: o[1],
+        onclick: function () { collMode = o[0]; renderCollection(container); } }));
+    });
+    container.appendChild(seg);
+
+    // stats
+    if (collMode === 'owned') {
+      const uniq = {}; s.inv.forEach(function (it) { uniq[it.sid] = 1; });
+      container.appendChild(el('div', { class: 'coll-stats' }, [
+        stat(String(s.inv.length), 'creatures'),
+        stat('⛁ ' + fmt(collectionValue()), 'total value'),
+        stat(Object.keys(uniq).length + '/' + G.state.allSpecies().length, 'species')
+      ]));
+    } else {
+      const d = dexCounts();
+      container.appendChild(el('div', { class: 'coll-stats' }, [
+        stat(d.have + '/' + d.total, 'discovered'),
+        stat(String(d.locked), 'locked'),
+        stat(String(G.state.allSpecies().length), 'total')
+      ]));
+    }
+
+    // controls (filter always; sort only in Owned)
     const filterSel = el('select', { class: 'ctrl' });
     filterSel.appendChild(el('option', { value: 'all', text: 'All rarities' }));
     G.data.RARITIES.forEach(function (r) { filterSel.appendChild(el('option', { value: r.tier, text: r.name })); });
     filterSel.value = collFilter;
     filterSel.addEventListener('change', function () { collFilter = filterSel.value; renderCollection(container); });
-    const sortSel = el('select', { class: 'ctrl' });
-    [['rarity', 'Rarity ↓'], ['value', 'Value ↓'], ['name', 'Name A–Z'], ['element', 'Element']].forEach(function (o) {
-      sortSel.appendChild(el('option', { value: o[0], text: o[1] }));
-    });
-    sortSel.value = collSort;
-    sortSel.addEventListener('change', function () { collSort = sortSel.value; renderCollection(container); });
-    container.appendChild(el('div', { class: 'controls' }, [filterSel, sortSel]));
+    const controls = [filterSel];
+    if (collMode === 'owned') {
+      const sortSel = el('select', { class: 'ctrl' });
+      [['rarity', 'Rarity ↓'], ['value', 'Value ↓'], ['name', 'Name A–Z'], ['element', 'Element']].forEach(function (o) {
+        sortSel.appendChild(el('option', { value: o[0], text: o[1] }));
+      });
+      sortSel.value = collSort;
+      sortSel.addEventListener('change', function () { collSort = sortSel.value; renderCollection(container); });
+      controls.push(sortSel);
+    }
+    container.appendChild(el('div', { class: 'controls' }, controls));
+
+    if (collMode === 'dex') { renderDexGrid(container); return; }
 
     let items = s.inv.slice();
     if (collFilter !== 'all') items = items.filter(function (it) {
@@ -104,6 +184,8 @@
 
   // ---- hatch ---------------------------------------------------------------
   const EGGS = [
+    { id: 'daily', name: 'Daily Egg', icon: '🎁', cost: 0, cd: 24 * 3600 * 1000, special: 'dex', shiny: 0.05,
+      desc: 'Free once a day — a creature from any unlocked rarity, favouring ones you haven\'t collected yet!' },
     { id: 'free', name: 'Free Egg', icon: '🥚', cost: 0, cd: 30000, min: 0, max: 3, shiny: 0.02,
       desc: 'A free egg every 30 seconds.' },
     { id: 'basic', name: 'Basic Egg', icon: '🥚', cost: 120, min: 0, max: 3, shiny: 0.03,
@@ -123,7 +205,7 @@
       s.cooldowns[egg.id] = Date.now() + egg.cd;
     }
     if (egg.cost > 0) G.state.addCoins(-egg.cost);
-    const sp = G.state.randomSpecies(egg.min, egg.max);
+    const sp = egg.special === 'dex' ? G.state.dailyPick() : G.state.randomSpecies(egg.min, egg.max);
     if (!sp) { toast('No creatures available.', 'bad'); return; }
     const isShiny = Math.random() < egg.shiny;
     const inst = G.state.addSpecies(sp.id, isShiny);
@@ -134,6 +216,12 @@
     refreshAll();
   }
 
+  function cdLabel(ms) {
+    const s = Math.ceil(ms / 1000);
+    if (s >= 3600) return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm';
+    if (s >= 60) return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+    return s + 's';
+  }
   let cdTimer = null;
   function renderHatch(container) {
     container.innerHTML = '';
@@ -163,7 +251,7 @@
         const btn = grid.querySelector('button[data-egg="' + egg.id + '"]');
         if (!btn) return;
         const left = (s.cooldowns[egg.id] || 0) - Date.now();
-        if (left > 0) { btn.disabled = true; btn.textContent = Math.ceil(left / 1000) + 's'; }
+        if (left > 0) { btn.disabled = true; btn.textContent = cdLabel(left); }
         else { btn.disabled = false; btn.textContent = 'Hatch'; }
       });
     }, 250);

@@ -14,7 +14,7 @@ with **no backend required**, hosted on GitHub Pages.
 - **SFX + VFX** — pulling a Rare or better plays a Vampire-Survivors-style
   suspense build-up first (god-rays, a shaking mystery orb cycling sprites, a
   rising riser tone, all scaling in length/intensity with rarity — ~1.4s for a
-  Rare up to ~5s for an Omega), then bursts into a synthesized Web Audio chime
+  Rare up to ~8s for an Omega), then bursts into a synthesized Web Audio chime
   and a confetti + shockwave reveal. A mute toggle lives in the top bar.
 - **Swipe navigation** — swipe left/right anywhere on a page to move between
   tabs (with a slide animation). Ignores vertical scrolls and is disabled while
@@ -28,7 +28,12 @@ with **no backend required**, hosted on GitHub Pages.
   deterministically from its id, so the roster can grow without art files.
   Includes ✨ shiny variants worth 5×.
 - **Hatch eggs** to grow your collection; sell duplicates for coins to buy
-  better eggs.
+  better eggs. A free **Daily Egg** gives a creature from any unlocked rarity,
+  favouring species you haven't collected yet (so it steadily fills your dex).
+- **Critterdex view** in the Collection (Owned ⇄ Critterdex toggle): every
+  species shown as a card — owned in full colour with counts, undiscovered as
+  "???" silhouettes, and prestige-locked rarities as 🔒 silhouettes so you can
+  see what's coming.
 - **Ranch (idle income)** — your creatures passively generate coins per second
   based on rarity, even while the app is closed (offline earnings, capped).
   Spend coins on upgrades (Habitat, Gilded Cages, Cozy Beds) to earn faster.

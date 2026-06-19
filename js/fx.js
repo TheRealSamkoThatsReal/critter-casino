@@ -151,7 +151,8 @@
   // Only kicks in for Rare (tier>=2)+, scaling length/intensity with rarity.
   function suspense(tier, onDone) {
     if (tier == null || tier < 2 || !G.data || !G.sprites) { if (onDone) onDone(); return; }
-    const dur = Math.min(4500, 1100 + (tier - 2) * 350);
+    // longer + more intense the rarer it is (Rare ~1.6s up to ~8s for Omega)
+    const dur = Math.min(8000, 1600 + (tier - 2) * 800);
     const rcol = hexRgb(G.data.rarity(tier).color), white = [255, 255, 255];
     const W = window.innerWidth, H = window.innerHeight, dpr = window.devicePixelRatio || 1;
 
@@ -169,7 +170,7 @@
     const x = cv.getContext('2d'); x.scale(dpr, dpr);
     const cx = (W + 60) / 2, cy = (H + 60) / 2;
     const species = G.state.allSpecies();
-    const rays = 10 + tier * 2;
+    const rays = 12 + tier * 3;
     let start = null, lastSwap = 0, swapEvery = 55;
 
     riser(dur, tier);
@@ -178,9 +179,10 @@
     function frame(ts) {
       if (start == null) start = ts;
       const p = Math.min(1, (ts - start) / dur);
-      const ct = Math.max(0, (p - 0.45) / 0.55);      // color reveal in the 2nd half
+      const ct = Math.max(0, (p - 0.5) / 0.5);        // color reveal in the 2nd half
       const col = lerpColor(white, rcol, ct);
-      const amp = (p * p) * (5 + tier);
+      // shake ramps harder near the climax, stronger for rarer tiers
+      const amp = (p * p * p) * (8 + tier * 1.8) * (1 + 2 * Math.max(0, p - 0.8));
       const sx = (Math.random() - 0.5) * amp, sy = (Math.random() - 0.5) * amp;
       cv.style.transform = 'translate(' + sx + 'px,' + sy + 'px)';
 
@@ -194,13 +196,13 @@
         x.lineTo(Math.cos(-spread) * len, Math.sin(-spread) * len);
         x.lineTo(Math.cos(spread) * len, Math.sin(spread) * len);
         x.closePath();
-        x.globalAlpha = 0.05 + 0.16 * p; x.fillStyle = col; x.fill();
+        x.globalAlpha = 0.05 + 0.22 * p; x.fillStyle = col; x.fill();
       }
       x.restore();
 
-      const s = 0.75 + 0.45 * p + 0.08 * Math.sin(ts / 70 * (1 + p));
+      const s = 0.7 + 0.55 * p + (0.06 + 0.12 * p) * Math.sin(ts / 60 * (1 + p));
       orb.style.transform = 'translate(' + sx + 'px,' + sy + 'px) scale(' + s + ')';
-      orb.style.boxShadow = '0 0 ' + (20 + 90 * p) + 'px ' + (4 + 30 * p) + 'px ' + col;
+      orb.style.boxShadow = '0 0 ' + (20 + 120 * p) + 'px ' + (4 + 40 * p) + 'px ' + col;
       orb.style.borderColor = col;
       q.style.opacity = String(1 - ct);
 

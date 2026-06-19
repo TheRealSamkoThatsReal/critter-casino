@@ -60,12 +60,14 @@
     c.style.setProperty('--glow', r.glow === 'none' ? 'transparent' : r.glow);
     c.style.setProperty('--rcolor', r.color);
     const spr = el('div', { class: 'spritebox' });
-    spr.appendChild(G.sprites.el(sp, size));
-    if (item.shiny) spr.appendChild(el('div', { class: 'shiny-star', text: '★' }));
+    const sprCanvas = G.sprites.el(sp, size);
+    if (opts.silhouette) sprCanvas.classList.add('silhouette');
+    spr.appendChild(sprCanvas);
+    if (item.shiny && !opts.silhouette) spr.appendChild(el('div', { class: 'shiny-star', text: '★' }));
     c.appendChild(spr);
-    c.appendChild(el('div', { class: 'cname', text: sp.name }));
+    c.appendChild(el('div', { class: 'cname', text: opts.silhouette ? (opts.nameOverride || '???') : sp.name }));
     c.appendChild(el('div', { class: 'crarity', text: r.name }));
-    if (opts.showValue !== false)
+    if (opts.showValue !== false && !opts.silhouette)
       c.appendChild(el('div', { class: 'cvalue', html: '⛁ ' + fmt(G.state.valueOf(item)) }));
     if (opts.badge) c.appendChild(el('div', { class: 'cbadge', text: opts.badge }));
     if (opts.onClick) {

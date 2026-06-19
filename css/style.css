@@ -140,6 +140,12 @@ body {
   background: radial-gradient(circle, rgba(255,225,120,.35), transparent 70%); pointer-events: none; }
 .shiny-star { position: absolute; top: -2px; right: -2px; color: #ffe14d; font-size: 14px;
   text-shadow: 0 0 6px #ffb800; }
+.sprite.silhouette { filter: brightness(0) opacity(0.5); }
+.seg { display: flex; gap: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 3px; margin-bottom: 12px; }
+.seg-btn { flex: 1; background: none; border: 0; color: var(--muted); font-weight: 700; font-size: 13.5px;
+  padding: 8px; border-radius: 9px; cursor: pointer; }
+.seg-btn.active { background: var(--panel2); color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.3); }
 .card-del { position: absolute; bottom: 4px; right: 4px; background: #3a1620; color: #ff9bb0;
   border: 1px solid #6e2030; border-radius: 7px; font-size: 11px; padding: 1px 5px; cursor: pointer; }
 
