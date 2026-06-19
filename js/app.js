@@ -19,16 +19,6 @@
       pb.hidden = lvl < 1;
       pb.textContent = '✨ ' + lvl;
     }
-    const collBtn = document.querySelector('.navbtn[data-view="collection"]');
-    if (collBtn) {
-      const n = G.state.newCount();
-      let nb = collBtn.querySelector('.nav-badge');
-      if (n > 0) {
-        if (!nb) { nb = el('span', { class: 'nav-badge' }); collBtn.appendChild(nb); }
-        nb.textContent = n > 99 ? '99+' : String(n);
-        nb.hidden = false;
-      } else if (nb) { nb.hidden = true; }
-    }
   }
 
   // ---- collection ----------------------------------------------------------
@@ -36,17 +26,8 @@
     return G.state.get().inv.reduce(function (a, it) { return a + G.state.valueOf(it); }, 0);
   }
 
-  // viewing a creature's detail acknowledges its NEW badge; refresh the grid
-  // (behind the modal) and the Collection tab count to reflect it.
-  function markSpeciesSeen(sid) {
-    if (!G.state.isNew(sid)) return;
-    G.state.markSeen(sid);
-    setTimeout(function () { if (window.refreshAll) window.refreshAll(); }, 0);
-  }
-
   function detail(item) {
     const sp = G.state.getSpecies(item.sid);
-    markSpeciesSeen(sp.id);
     const r = G.data.rarity(sp.tier);
     const node = el('div', { class: 'detail' });
     const big = el('div', { class: 'detail-sprite r' + sp.tier });
@@ -85,7 +66,6 @@
 
   // read-only species detail (Critterdex)
   function speciesDetail(sp) {
-    markSpeciesSeen(sp.id);
     const r = G.data.rarity(sp.tier);
     const node = el('div', { class: 'detail' });
     const big = el('div', { class: 'detail-sprite r' + sp.tier });
@@ -354,11 +334,13 @@
     content.appendChild(el('div', { class: 'reveal-head', text: headline || ('Hatched ×' + results.length + '!') }));
     const grid = el('div', { class: 'grid pick-grid' });
     arr.forEach(function (g, i) {
-      const card = G.ui.card(g.item, { size: 56, showValue: false, badge: g.count > 1 ? ('×' + g.count) : null });
+      const card = G.ui.card(g.item, { size: 56, showValue: false, showNew: true, badge: g.count > 1 ? ('×' + g.count) : null });
       card.classList.add('pop-in');
       card.style.animationDelay = Math.min(i * 0.04, 1.5) + 's'; // sequential cascade, rarest first
       grid.appendChild(card);
     });
+    // NEW badges are shown here on the summary popup only; clear so dupes later don't re-flag
+    arr.forEach(function (g) { if (G.state.markSeen) G.state.markSeen(g.item.sid); });
     content.appendChild(grid);
     node.appendChild(content);
 

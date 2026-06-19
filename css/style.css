@@ -86,14 +86,6 @@ body {
   padding: 8px 0 6px; font-size: 11px; font-weight: 600; cursor: pointer;
   transition: color .15s;
 }
-.navbtn .nav-badge {
-  position: absolute; top: 4px; left: 50%; margin-left: 6px;
-  min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
-  background: linear-gradient(180deg, #4dff9b, #19c46b); color: #06190f;
-  font-size: 10px; font-weight: 900; line-height: 16px; text-align: center;
-  border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.5);
-}
-.navbtn .nav-badge[hidden] { display: none; }
 .navbtn[hidden] { display: none; }
 .navbtn .ni { font-size: 21px; line-height: 1; }
 .navbtn.active { color: var(--ink); }
