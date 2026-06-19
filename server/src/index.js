@@ -6,6 +6,7 @@
  *                         chosen local hour, unless they already played today.
  * Subscriptions live in the SUBS KV namespace. No accounts, no game save —
  * just the push subscription + a reminder hour + timezone + last-active day. */
+import { DurableObject } from 'cloudflare:workers';
 import { sendPush } from './webpush.js';
 
 const CORS = {
@@ -27,6 +28,92 @@ function localDayStr(tzMin) {
   const d = new Date(Date.now() + (tzMin || 0) * 60000);
   return d.toISOString().slice(0, 10);
 }
+
+// ---- trade board helpers ---------------------------------------------------
+function tid() {
+  return Date.now().toString(36) + Math.floor(Math.random() * 1679616).toString(36);
+}
+function cleanTokens(arr, max) {
+  if (!Array.isArray(arr)) return null;
+  const out = [];
+  for (let i = 0; i < arr.length && out.length < (max || 12); i++) {
+    const n = parseInt(arr[i], 10);
+    if (Number.isFinite(n) && n >= 0 && n < 100000) out.push(n);
+  }
+  return out;
+}
+function person(p) {
+  p = p || {};
+  return { id: String(p.id || '').slice(0, 40), name: String(p.name || 'Trainer').slice(0, 20) };
+}
+function rowToTrade(r) {
+  return {
+    id: r.id, owner: { id: r.owner_id, name: r.owner_name }, give: JSON.parse(r.give),
+    want: r.want || '', status: r.status, created: r.created,
+    claimer: r.claimer_id ? { id: r.claimer_id, name: r.claimer_name } : null,
+    ownerGets: r.owner_gets ? JSON.parse(r.owner_gets) : null
+  };
+}
+
+// Strongly-consistent, single-claim trade board. One DO instance ("board")
+// serializes all operations, so posts are visible immediately and a trade can
+// only be claimed once (no dup exploit, no KV list lag). Low traffic -> a single
+// instance is fine here.
+export class TradeBoard extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    this.sql = ctx.storage.sql;
+    ctx.blockConcurrencyWhile(async () => {
+      this.sql.exec('CREATE TABLE IF NOT EXISTS trades (' +
+        'id TEXT PRIMARY KEY, owner_id TEXT, owner_name TEXT, give TEXT, want TEXT, ' +
+        'status TEXT, created INTEGER, claimer_id TEXT, claimer_name TEXT, owner_gets TEXT)');
+    });
+  }
+  post(owner, give, want) {
+    const g = cleanTokens(give); if (!g || !g.length) return { error: 'nothing to give' };
+    const o = person(owner); if (!o.id) return { error: 'no owner' };
+    const n = this.sql.exec("SELECT COUNT(*) c FROM trades WHERE owner_id=? AND status='open'", o.id).one().c;
+    if (n >= 20) return { error: 'too many open trades' };
+    const id = tid();
+    this.sql.exec('INSERT INTO trades (id,owner_id,owner_name,give,want,status,created,claimer_id,claimer_name,owner_gets) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      id, o.id, o.name, JSON.stringify(g), String(want || '').slice(0, 80), 'open', Date.now(), null, null, null);
+    return { ok: true, id: id };
+  }
+  list() {
+    const rows = this.sql.exec("SELECT * FROM trades WHERE status='open' ORDER BY created DESC LIMIT 60").toArray();
+    return { ok: true, trades: rows.map(rowToTrade) };
+  }
+  mine(ownerId) {
+    const rows = this.sql.exec('SELECT * FROM trades WHERE owner_id=? ORDER BY created DESC', String(ownerId || '')).toArray();
+    return { ok: true, trades: rows.map(rowToTrade) };
+  }
+  claim(id, claimer, back) {
+    const row = this.sql.exec('SELECT * FROM trades WHERE id=?', String(id || '')).toArray()[0];
+    if (!row) return { error: 'not found' };
+    if (row.status !== 'open') return { error: 'unavailable' };
+    const c = person(claimer);
+    if (c.id && c.id === row.owner_id) return { error: 'own trade' };
+    const b = cleanTokens(back) || [];
+    if (b.length) this.sql.exec("UPDATE trades SET status='claimed', claimer_id=?, claimer_name=?, owner_gets=? WHERE id=?", c.id, c.name, JSON.stringify(b), row.id);
+    else this.sql.exec('DELETE FROM trades WHERE id=?', row.id);
+    return { ok: true, give: JSON.parse(row.give) };
+  }
+  collect(id, ownerId) {
+    const row = this.sql.exec('SELECT * FROM trades WHERE id=?', String(id || '')).toArray()[0];
+    if (!row || row.owner_id !== String(ownerId || '')) return { error: 'not owner' };
+    if (row.status !== 'claimed' || !row.owner_gets) return { ok: true, give: [] };
+    this.sql.exec('DELETE FROM trades WHERE id=?', row.id);
+    return { ok: true, give: JSON.parse(row.owner_gets) };
+  }
+  cancel(id, ownerId) {
+    const row = this.sql.exec('SELECT * FROM trades WHERE id=?', String(id || '')).toArray()[0];
+    if (!row || row.owner_id !== String(ownerId || '')) return { error: 'not owner' };
+    if (row.status !== 'open') return { error: 'cannot cancel' };
+    this.sql.exec('DELETE FROM trades WHERE id=?', row.id);
+    return { ok: true, give: JSON.parse(row.give) };
+  }
+}
+function board(env) { return env.TRADE.get(env.TRADE.idFromName('board')); }
 
 export default {
   async fetch(request, env) {
@@ -79,6 +166,26 @@ export default {
       try { b = await request.json(); } catch (e) { return json({ error: 'bad json' }, 400); }
       if (b && b.endpoint) await env.SUBS.delete(await keyFor(b.endpoint));
       return json({ ok: true });
+    }
+
+    // ---- trade board (Durable Object: strongly consistent + atomic) ---------
+    if (url.pathname === '/trade/list' && request.method === 'GET') {
+      return json(await board(env).list());
+    }
+    if (request.method === 'POST' && url.pathname.indexOf('/trade/') === 0) {
+      let b;
+      try { b = await request.json(); } catch (e) { return json({ error: 'bad json' }, 400); }
+      const op = url.pathname.slice('/trade/'.length);
+      const bd = board(env);
+      if (op === 'post') return json(await bd.post(b.owner, b.give, b.want));
+      if (op === 'claim') return json(await bd.claim(b.id, b.claimer, b.give));
+      if (op === 'cancel') return json(await bd.cancel(b.id, b.ownerId));
+      if (op === 'collect') return json(await bd.collect(b.id, b.ownerId));
+      return json({ error: 'bad op' }, 400);
+    }
+    if (request.method === 'POST' && url.pathname === '/trade-mine') {
+      let b; try { b = await request.json(); } catch (e) { return json({ error: 'bad json' }, 400); }
+      return json(await board(env).mine(b && b.ownerId));
     }
 
     return json({ error: 'not found' }, 404);

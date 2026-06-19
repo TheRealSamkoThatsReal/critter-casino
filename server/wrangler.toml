@@ -14,6 +14,15 @@ crons = ["* * * * *"]
 binding = "SUBS"
 id = "65af74be3ddc44ae8de60ed84de096b2"
 
+# Trade board (strongly-consistent, atomic single-claim)
+[[durable_objects.bindings]]
+name = "TRADE"
+class_name = "TradeBoard"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TradeBoard"]
+
 [vars]
 # Public VAPID key (safe to commit). Must match VAPID_PUBLIC_KEY in js/push.js.
 VAPID_PUBLIC = "BIib9JSjizYPUcIlyTTCIKNXUT20TSgGEMG4VMMZqCIW_JvrdPYFw-rlKIK7ZAv1DrGnlLfnsTT8eUG-PI_dpRg"

@@ -62,8 +62,14 @@ with **no backend required**, hosted on GitHub Pages.
     on center, ×5), **Quick Draw** (reaction time, ×4), **Echo** (repeat a color
     sequence, ×3).
   - Pool a pile of commons for a real shot at an Epic, Mythic, or Divine.
-- **Player-to-player trading** via shareable codes (offer → accept → complete),
-  with escrow and reclaim — no servers or accounts.
+- **Player-to-player trading** two ways:
+  - **Live Trade Board** (server-backed): post creatures to a public board; the
+    first player to claim them gets them, and each trade can be **claimed only
+    once** (no dupes). Backed by a Cloudflare Durable Object for strongly-
+    consistent, atomic claims. Post / claim / cancel / collect with escrow.
+  - **Offline code trade**: compact shareable codes (offer → accept → complete)
+    that need no server — but, being client-only, are honor-based (a code can be
+    redeemed by multiple people).
 - **Hidden admin panel** to design and add creatures (live sprite preview +
   pixel editor), grant creatures, change the admin passcode, and manage the
   game. The Admin tab is hidden until you do the secret knock (see below).

@@ -112,6 +112,7 @@
     supported: supported, configured: configured, permission: permission,
     isStandalone: isStandalone, isIOS: isIOS,
     isEnabled: isEnabled, enable: enable, disable: disable, heartbeat: heartbeat,
-    sendTest: sendTest, getHour: getHour, setHour: setHour
+    sendTest: sendTest, getHour: getHour, setHour: setHour,
+    base: function () { return PUSH_BASE; } // shared Worker URL (also used by the trade board)
   };
 })(window.G = window.G || {});

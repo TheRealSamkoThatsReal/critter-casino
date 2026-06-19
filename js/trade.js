@@ -260,34 +260,191 @@
     ]));
   }
 
+  // ===== live trade board (server-backed, single-claim) =====================
+  function me() { return G.state.get().player; }
+  function serverBase() { return (G.push && G.push.base) ? G.push.base() : ''; }
+  function api(path, method, body) {
+    const base = serverBase();
+    if (!base) return Promise.reject(new Error('no server'));
+    return fetch(base + path, {
+      method: method || 'GET',
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) { return r.json(); });
+  }
+  function toTokens(items) { return items.map(function (it) { return sidIndex(it.sid) * 2 + (it.shiny ? 1 : 0); }); }
+  function fromTokens(arr) {
+    return (arr || []).map(function (n) { const sp = ROSTER[n >> 1]; return { sid: sp ? sp.id : '?', shiny: (n & 1) === 1 }; });
+  }
+  function spriteRow(items, size) {
+    const row = el('div', { class: 'trade-sprites' });
+    items.forEach(function (it) { row.appendChild(G.ui.card(it, { size: size || 46, showValue: false })); });
+    return row;
+  }
+  // grid of the player's (built-in) creatures with tap-to-select; returns {grid, selected}
+  function pickGrid(size) {
+    const selected = {};
+    const grid = el('div', { class: 'grid pick-grid' });
+    G.state.get().inv.slice().sort(function (a, b) { return G.state.valueOf(b) - G.state.valueOf(a); }).forEach(function (item) {
+      if (sidIndex(item.sid) < 0) return; // built-in only
+      grid.appendChild(G.ui.card(item, { size: size || 50, onClick: function (it, node) {
+        if (selected[item.iid]) { delete selected[item.iid]; node.classList.remove('selected'); }
+        else { selected[item.iid] = item; node.classList.add('selected'); }
+      } }));
+    });
+    return { grid: grid, list: function () { return Object.keys(selected).map(function (k) { return selected[k]; }); } };
+  }
+
+  function renderBoardInto(listEl) {
+    listEl.innerHTML = '';
+    listEl.appendChild(el('p', { class: 'gdesc', text: 'Loading trades…' }));
+    api('/trade/list').then(function (res) {
+      const trades = (res && res.trades) || [];
+      listEl.innerHTML = '';
+      if (!trades.length) { listEl.appendChild(el('p', { class: 'gdesc', text: 'No open trades right now — post one!' })); return; }
+      trades.forEach(function (t) {
+        const mine = t.owner.id === me().id;
+        const row = el('div', { class: 'trade-row' }, [
+          el('div', { class: 'trade-row-head' }, [
+            el('span', { class: 'trade-owner', text: t.owner.name || 'Trainer' }),
+            t.want ? el('span', { class: 'trade-want', text: '“' + t.want + '”' }) : null
+          ]),
+          spriteRow(fromTokens(t.give)),
+          el('div', { class: 'gaction' }, [
+            mine ? el('span', { class: 'gsub', text: 'Your trade' })
+                 : el('button', { class: 'btn small primary', text: 'Claim', onclick: function () { claimTrade(t); } })
+          ])
+        ]);
+        listEl.appendChild(row);
+      });
+    }).catch(function () { listEl.innerHTML = ''; listEl.appendChild(el('p', { class: 'gdesc', text: '⚠️ Trade server unavailable.' })); });
+  }
+
+  function postTrade() {
+    const pg = pickGrid(50);
+    if (!pg.grid.children.length) { toast('No tradeable creatures to offer.', 'bad'); return; }
+    const wantInp = el('input', { class: 'a-input', placeholder: 'What you\'re hoping for (optional)', maxlength: 80 });
+    const wrap = el('div', {}, [
+      el('p', { class: 'gdesc', text: 'Pick creatures to offer on the public board. The first player to claim them gets them.' }),
+      wantInp, pg.grid
+    ]);
+    const goBtn = el('button', { class: 'btn primary', text: 'Post to board' });
+    const m = G.ui.modal('Post a Trade', wrap, { footer: goBtn });
+    goBtn.addEventListener('click', function () {
+      const items = pg.list();
+      if (!items.length) { toast('Select at least one creature.', 'bad'); return; }
+      goBtn.disabled = true;
+      api('/trade/post', 'POST', { owner: { id: me().id, name: me().name }, give: toTokens(items), want: wantInp.value })
+        .then(function (res) {
+          if (!res || !res.ok) { toast((res && res.error) || 'Post failed.', 'bad'); goBtn.disabled = false; return; }
+          items.forEach(function (it) { G.state.removeInstance(it.iid); }); // escrow after server confirms
+          G.state.save();
+          m.close(); toast('Posted to the board!', 'good');
+          if (window.refreshAll) window.refreshAll();
+        })
+        .catch(function () { toast('Trade server unavailable.', 'bad'); goBtn.disabled = false; });
+    });
+  }
+
+  function claimTrade(t) {
+    const wrap = el('div', {});
+    wrap.appendChild(el('p', { class: 'gdesc', html: '<b>' + (t.owner.name || 'Trainer') + '</b> is offering:' }));
+    wrap.appendChild(spriteRow(fromTokens(t.give), 52));
+    if (t.want) wrap.appendChild(el('p', { class: 'gdesc', text: 'They want: ' + t.want }));
+    wrap.appendChild(el('p', { class: 'gdesc', text: 'Give creatures back (optional):' }));
+    const pg = pickGrid(48);
+    wrap.appendChild(pg.grid);
+    const goBtn = el('button', { class: 'btn primary', text: 'Claim trade' });
+    const m = G.ui.modal('Claim trade', wrap, { footer: goBtn });
+    goBtn.addEventListener('click', function () {
+      goBtn.disabled = true;
+      const back = pg.list();
+      api('/trade/claim', 'POST', { id: t.id, claimer: { id: me().id, name: me().name }, give: toTokens(back) })
+        .then(function (res) {
+          if (!res || !res.ok) { toast(res && res.error === 'unavailable' ? 'Too late — already claimed!' : 'Claim failed.', 'bad'); m.close(); return; }
+          fromTokens(res.give).forEach(function (it) { G.state.addInstance(G.state.mkInstance(it.sid, it.shiny)); });
+          back.forEach(function (it) { G.state.removeInstance(it.iid); }); // escrow give-back to the owner
+          G.state.get().stats.traded++; G.state.save();
+          m.close(); toast('Trade claimed! 🎉', 'good');
+          if (window.refreshAll) window.refreshAll();
+        })
+        .catch(function () { toast('Trade server unavailable.', 'bad'); goBtn.disabled = false; });
+    });
+  }
+
+  function myTrades() {
+    const wrap = el('div', {}, [el('p', { class: 'gdesc', text: 'Loading…' })]);
+    const m = G.ui.modal('My Trades', wrap);
+    function reload() {
+      api('/trade-mine', 'POST', { ownerId: me().id }).then(function (res) {
+        wrap.innerHTML = '';
+        const trades = (res && res.trades) || [];
+        if (!trades.length) { wrap.appendChild(el('p', { class: 'gdesc', text: 'You have no active trades.' })); return; }
+        trades.forEach(function (t) {
+          const row = el('div', { class: 'trade-row' }, [spriteRow(fromTokens(t.give), 44)]);
+          if (t.status === 'open') {
+            row.appendChild(el('div', { class: 'gaction' }, [
+              el('span', { class: 'gsub', text: 'Open on board' }),
+              el('button', { class: 'btn small', text: 'Cancel & reclaim', onclick: function () {
+                api('/trade/cancel', 'POST', { id: t.id, ownerId: me().id }).then(function (r) {
+                  if (r && r.ok) { fromTokens(r.give).forEach(function (it) { G.state.addInstance(G.state.mkInstance(it.sid, it.shiny)); }); G.state.save(); toast('Reclaimed.', 'good'); if (window.refreshAll) window.refreshAll(); reload(); }
+                  else toast('Could not cancel.', 'bad');
+                }).catch(function () { toast('Server unavailable.', 'bad'); });
+              } })
+            ]));
+          } else if (t.status === 'claimed') {
+            row.appendChild(el('div', { class: 'gaction' }, [
+              el('span', { class: 'gsub', text: 'Claimed by ' + ((t.claimer && t.claimer.name) || 'someone') }),
+              el('button', { class: 'btn small primary', text: 'Collect return', onclick: function () {
+                api('/trade/collect', 'POST', { id: t.id, ownerId: me().id }).then(function (r) {
+                  if (r && r.ok) { fromTokens(r.give).forEach(function (it) { G.state.addInstance(G.state.mkInstance(it.sid, it.shiny)); }); G.state.save(); toast((r.give && r.give.length) ? 'Collected!' : 'Nothing to collect.', 'good'); if (window.refreshAll) window.refreshAll(); reload(); }
+                  else toast('Could not collect.', 'bad');
+                }).catch(function () { toast('Server unavailable.', 'bad'); });
+              } })
+            ]));
+          }
+          wrap.appendChild(row);
+        });
+      }).catch(function () { wrap.innerHTML = ''; wrap.appendChild(el('p', { class: 'gdesc', text: '⚠️ Trade server unavailable.' })); });
+    }
+    reload();
+  }
+
   function render(container) {
     container.innerHTML = '';
     container.appendChild(el('h2', { class: 'view-title', text: '🤝 Trade' }));
     container.appendChild(el('p', { class: 'view-sub', text:
-      'Trade creatures with friends using share codes — no internet account needed.' }));
-    const me = G.state.get().player;
-    const nameRow = el('div', { class: 'name-row' }, [
+      'Post creatures to the live board — first to claim gets them. Each trade can only be claimed once.' }));
+    const meP = me();
+    container.appendChild(el('div', { class: 'name-row' }, [
       el('label', { text: 'Your trainer name: ' }),
       (function () {
-        const inp = el('input', { class: 'tname', value: me.name, maxlength: 20 });
-        inp.addEventListener('change', function () {
-          me.name = inp.value.trim() || 'Trainer'; G.state.save(); toast('Name saved.', 'good');
-        });
+        const inp = el('input', { class: 'tname', value: meP.name, maxlength: 20 });
+        inp.addEventListener('change', function () { meP.name = inp.value.trim() || 'Trainer'; G.state.save(); toast('Name saved.', 'good'); });
         return inp;
       })()
-    ]);
-    container.appendChild(nameRow);
-    const actions = el('div', { class: 'trade-actions' }, [
-      el('button', { class: 'btn primary big', text: '➕ Create Offer', onclick: createOffer }),
-      el('button', { class: 'btn big', text: '📥 Import Code', onclick: importCode })
-    ]);
-    container.appendChild(actions);
-    container.appendChild(el('div', { class: 'help-card', html:
-      '<b>How to trade</b><ol>' +
-      '<li>One player taps <b>Create Offer</b>, picks creatures, and shares the code.</li>' +
-      '<li>The other taps <b>Import Code</b>, picks creatures to give back, and accepts.</li>' +
-      '<li>They send back the <b>accept code</b>; the first player imports it to finish.</li>' +
-      '</ol>' }));
+    ]));
+
+    if (serverBase()) {
+      const list = el('div', { class: 'trade-board' });
+      container.appendChild(el('div', { class: 'trade-actions' }, [
+        el('button', { class: 'btn primary', text: '➕ Post Trade', onclick: postTrade }),
+        el('button', { class: 'btn', text: '📦 My Trades', onclick: myTrades }),
+        el('button', { class: 'btn', text: '↻', title: 'Refresh', onclick: function () { renderBoardInto(list); } })
+      ]));
+      container.appendChild(el('h3', { class: 'lobby-head', text: '🛒 Trade Board' }));
+      container.appendChild(list);
+      renderBoardInto(list);
+    } else {
+      container.appendChild(el('p', { class: 'gdesc', text: 'Trade board unavailable (server not configured).' }));
+    }
+
+    // offline fallback: code-based trading
+    container.appendChild(el('h3', { class: 'lobby-head', text: '✉️ Trade by code (offline)' }));
+    container.appendChild(el('div', { class: 'trade-actions' }, [
+      el('button', { class: 'btn', text: '➕ Create Offer', onclick: createOffer }),
+      el('button', { class: 'btn', text: '📥 Import Code', onclick: importCode })
+    ]));
   }
 
   G.trade = { render: render };
