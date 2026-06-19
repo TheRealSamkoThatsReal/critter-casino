@@ -319,6 +319,134 @@
   }
   function dice2() { chooseWager(dice); }
 
+  // ===== SKILL minigames ====================================================
+
+  // ---- Bullseye (timing) ---------------------------------------------------
+  function timing(wager) {
+    const stake = stakeOf(wager);
+    const wrap = el('div', { class: 'game timing' });
+    wrap.appendChild(el('p', { class: 'gdesc', html:
+      'Tap STOP when the marker hits the <b>center</b>. Bullseye pays ×5, near-misses less, edges lose.' }));
+    const track = el('div', { class: 'tbar' });
+    const marker = el('div', { class: 'tbar-marker' });
+    track.appendChild(marker);
+    wrap.appendChild(el('div', { class: 'gstage' }, [track]));
+    const action = el('div', { class: 'gaction' });
+    const btn = el('button', { class: 'btn primary', text: 'STOP!' });
+    action.appendChild(btn); wrap.appendChild(action);
+    let pos = 0, dir = 1, raf = null, stopped = false;
+    const m = G.ui.modal('Bullseye', wrap, { onClose: function () { stopped = true; if (raf) cancelAnimationFrame(raf); } });
+    function frame() {
+      if (stopped) return;
+      pos += dir * 1.3;
+      if (pos >= 100) { pos = 100; dir = -1; } else if (pos <= 0) { pos = 0; dir = 1; }
+      marker.style.left = pos + '%';
+      raf = requestAnimationFrame(frame);
+    }
+    raf = requestAnimationFrame(frame);
+    btn.addEventListener('click', function () {
+      if (stopped) return; stopped = true; if (raf) cancelAnimationFrame(raf);
+      G.ui.haptic(20); btn.disabled = true;
+      const d = Math.abs(pos - 50);
+      const mult = d <= 4 ? 5 : d <= 12 ? 2.5 : d <= 25 ? 1.5 : 0;
+      marker.classList.add(mult > 0 ? 'hit' : 'miss');
+      setTimeout(function () {
+        const res = resolve(wager, mult);
+        showResult(res, action, function () { m.close(); timing2(); });
+      }, 650);
+    });
+  }
+  function timing2() { chooseWager(timing); }
+
+  // ---- Quick Draw (reaction) ----------------------------------------------
+  function reaction(wager) {
+    const wrap = el('div', { class: 'game reaction' });
+    wrap.appendChild(el('p', { class: 'gdesc', html:
+      'When the box turns <b>GREEN</b>, tap as fast as you can. Tap too early and you lose!' }));
+    const pad = el('div', { class: 'react-pad waiting', text: 'Wait…' });
+    wrap.appendChild(el('div', { class: 'gstage' }, [pad]));
+    const action = el('div', { class: 'gaction' });
+    wrap.appendChild(action);
+    let state = 'waiting', goAt = 0, to = null;
+    const m = G.ui.modal('Quick Draw', wrap, { onClose: function () { state = 'done'; if (to) clearTimeout(to); } });
+    to = setTimeout(function () {
+      if (state !== 'waiting') return;
+      state = 'go'; goAt = performance.now();
+      pad.className = 'react-pad go'; pad.textContent = 'TAP!';
+    }, 1200 + Math.random() * 2600);
+    function done(mult, label) {
+      if (state === 'done') return;
+      state = 'done'; if (to) clearTimeout(to);
+      pad.className = 'react-pad ' + (mult > 0 ? 'go' : 'fail'); pad.textContent = label;
+      setTimeout(function () {
+        const res = resolve(wager, mult);
+        showResult(res, action, function () { m.close(); reaction2(); });
+      }, 750);
+    }
+    pad.addEventListener('click', function () {
+      if (state === 'waiting') done(0, 'Too soon! 💀');
+      else if (state === 'go') {
+        const ms = Math.round(performance.now() - goAt);
+        G.ui.haptic(20);
+        const mult = ms < 300 ? 4 : ms < 500 ? 2.5 : ms < 800 ? 1.5 : 0;
+        done(mult, ms + 'ms' + (mult ? ' • ×' + mult : ' • too slow'));
+      }
+    });
+  }
+  function reaction2() { chooseWager(reaction); }
+
+  // ---- Echo (memory) -------------------------------------------------------
+  function memory(wager) {
+    const wrap = el('div', { class: 'game memory' });
+    wrap.appendChild(el('p', { class: 'gdesc', html:
+      'Watch the sequence, then repeat it. Get all four right for <b>×3</b> — one mistake loses.' }));
+    const padWrap = el('div', { class: 'mem-pads' });
+    const COLORS = ['#ff5470', '#3d8bff', '#4caf50', '#ffd75e'];
+    const pads = COLORS.map(function (c, i) {
+      const p = el('div', { class: 'mem-pad' }); p.style.setProperty('--c', c); p.dataset.i = i; return p;
+    });
+    pads.forEach(function (p) { padWrap.appendChild(p); });
+    wrap.appendChild(el('div', { class: 'gstage' }, [padWrap]));
+    const status = el('div', { class: 'gsub', text: 'Watch…' });
+    wrap.appendChild(status);
+    const action = el('div', { class: 'gaction' });
+    wrap.appendChild(action);
+    let closed = false, accept = false, inputIdx = 0;
+    const m = G.ui.modal('Echo', wrap, { onClose: function () { closed = true; } });
+    const seq = []; for (let i = 0; i < 4; i++) seq.push(Math.floor(Math.random() * 4));
+    function flash(i, cb) {
+      if (closed) return;
+      const p = pads[i]; p.classList.add('lit'); G.ui.haptic(10);
+      setTimeout(function () { p.classList.remove('lit'); setTimeout(cb, 170); }, 380);
+    }
+    function playSeq(k) {
+      if (closed) return;
+      if (k >= seq.length) { accept = true; status.textContent = 'Your turn!'; return; }
+      flash(seq[k], function () { playSeq(k + 1); });
+    }
+    setTimeout(function () { playSeq(0); }, 550);
+    function finish(win) {
+      accept = false;
+      setTimeout(function () {
+        const res = resolve(wager, win ? 3 : 0);
+        showResult(res, action, function () { m.close(); memory2(); });
+      }, 450);
+    }
+    pads.forEach(function (p) {
+      p.addEventListener('click', function () {
+        if (!accept) return;
+        const i = +p.dataset.i;
+        p.classList.add('lit'); setTimeout(function () { p.classList.remove('lit'); }, 150);
+        G.ui.haptic(10);
+        if (i === seq[inputIdx]) {
+          inputIdx++;
+          if (inputIdx >= seq.length) { status.textContent = 'Correct! ✓'; finish(true); }
+        } else { status.textContent = 'Wrong! 💀'; finish(false); }
+      });
+    });
+  }
+  function memory2() { chooseWager(memory); }
+
   // ---- lobby ---------------------------------------------------------------
   const GAMES = [
     { id: 'coin', name: 'Coin Flip', icon: '⛀', desc: 'Double or nothing on your whole stake.', fn: coinFlip2 },
@@ -326,22 +454,34 @@
     { id: 'slots', name: 'Slots', icon: '🎰', desc: 'Match symbols for up to ×8.', fn: slots2 },
     { id: 'dice', name: 'High Roll', icon: '🎲', desc: 'Roll the dice — safer middle ground.', fn: dice2 }
   ];
+  const SKILL = [
+    { id: 'timing', name: 'Bullseye', icon: '🎯', desc: 'Stop the marker on center. Up to ×5.', fn: timing2 },
+    { id: 'react', name: 'Quick Draw', icon: '⚡', desc: 'Tap the moment it turns green. Up to ×4.', fn: reaction2 },
+    { id: 'memory', name: 'Echo', icon: '🧠', desc: 'Repeat the sequence for ×3.', fn: memory2 }
+  ];
+
+  function tile(g) {
+    return el('div', { class: 'game-tile clickable', onclick: g.fn }, [
+      el('div', { class: 'game-icon', text: g.icon }),
+      el('div', { class: 'game-name', text: g.name }),
+      el('div', { class: 'game-desc', text: g.desc })
+    ]);
+  }
 
   function render(container) {
     container.innerHTML = '';
     container.appendChild(el('h2', { class: 'view-title', text: '🎲 Casino' }));
     container.appendChild(el('p', { class: 'view-sub', text:
       'Wager one or many creatures — their combined value is your stake. Win bigger by betting bigger… or lose it all.' }));
-    const grid = el('div', { class: 'game-lobby' });
-    GAMES.forEach(function (g) {
-      const c = el('div', { class: 'game-tile clickable', onclick: g.fn }, [
-        el('div', { class: 'game-icon', text: g.icon }),
-        el('div', { class: 'game-name', text: g.name }),
-        el('div', { class: 'game-desc', text: g.desc })
-      ]);
-      grid.appendChild(c);
-    });
-    container.appendChild(grid);
+    container.appendChild(el('h3', { class: 'lobby-head', text: '🍀 Luck' }));
+    const luck = el('div', { class: 'game-lobby' });
+    GAMES.forEach(function (g) { luck.appendChild(tile(g)); });
+    container.appendChild(luck);
+    container.appendChild(el('h3', { class: 'lobby-head', text: '🎯 Skill' }));
+    container.appendChild(el('p', { class: 'view-sub', text: 'Your own timing, reflexes and memory decide the payout.' }));
+    const skill = el('div', { class: 'game-lobby' });
+    SKILL.forEach(function (g) { skill.appendChild(tile(g)); });
+    container.appendChild(skill);
   }
 
   G.games = { render: render };

@@ -58,6 +58,9 @@ with **no backend required**, hosted on GitHub Pages.
   - **Lucky Wheel** – spin for up to a ×10 jackpot.
   - **Slots** – match symbols for up to ×8.
   - **High Roll** – dice with a safer middle ground.
+  - **Skill games** where *you* decide the payout: **Bullseye** (stop the marker
+    on center, ×5), **Quick Draw** (reaction time, ×4), **Echo** (repeat a color
+    sequence, ×3).
   - Pool a pile of commons for a real shot at an Epic, Mythic, or Divine.
 - **Player-to-player trading** via shareable codes (offer → accept → complete),
   with escrow and reclaim — no servers or accounts.
