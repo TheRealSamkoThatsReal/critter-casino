@@ -92,6 +92,7 @@
     const tools = el('div', { class: 'wager-tools' }, [
       el('button', { class: 'btn small', text: '+5 cheapest', onclick: function () { addCheapest(5); } }),
       el('button', { class: 'btn small', text: '+10 cheapest', onclick: function () { addCheapest(10); } }),
+      el('button', { class: 'btn small', text: 'Wager all', onclick: function () { addCheapest(inv.length); } }),
       el('button', { class: 'btn small', text: 'Clear', onclick: clearAll })
     ]);
     const wrap = el('div', {}, [
