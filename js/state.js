@@ -11,6 +11,8 @@
     cooldowns: {},      // {free: timestamp}
     upgrades: {},       // idle upgrade levels {habitat, rarity, offline}
     lastTick: 0,        // timestamp of last income settle (for offline earnings)
+    lastFed: 0,         // timestamp creatures were last fed (hunger/starvation)
+    lastDeathRoll: 0,   // high-water mark for hourly starvation death rolls
     discovered: {},     // Critterdex: every species id ever owned (persists across sell/gamble)
     prestige: 0,        // number of times prestiged (permanent income multiplier)
     stats: { hatched: 0, gambled: 0, wins: 0, losses: 0, traded: 0 },
@@ -31,6 +33,8 @@
       if (!s.discovered) s.discovered = {};
       // migrate: credit anything currently owned to the Critterdex
       (s.inv || []).forEach(function (it) { s.discovered[it.sid] = 1; });
+      // existing players start well-fed so this update doesn't starve them
+      if (!s.lastFed) s.lastFed = Date.now();
       return s;
     } catch (e) {
       return seed(JSON.parse(JSON.stringify(def)));
@@ -40,6 +44,7 @@
   function seed(s) {
     s.player.id = genId();
     s.discovered = s.discovered || {};
+    s.lastFed = Date.now();
     // starter creatures so a new player has something to play with
     STARTERS.forEach(function (sid) {
       s.inv.push(mkInstance(sid));
@@ -175,6 +180,8 @@
     state.cooldowns = {};
     state.discovered = {};
     state.lastTick = Date.now();
+    state.lastFed = Date.now();
+    state.lastDeathRoll = 0;
     STARTERS.forEach(function (sid) { state.inv.push(mkInstance(sid)); state.discovered[sid] = 1; });
     save();
     return true;

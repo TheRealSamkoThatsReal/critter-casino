@@ -52,6 +52,7 @@ export default {
       rec.hour = Math.max(0, Math.min(23, parseInt(b.hour, 10) || 19));
       rec.tz = (typeof b.tz === 'number') ? b.tz : 0;
       rec.active = b.active || localDayStr(rec.tz); // last day the player was active
+      if (typeof b.lastFed === 'number' && b.lastFed > 0) rec.lastFed = b.lastFed; // for feed reminders
       await env.SUBS.put(k, JSON.stringify(rec));
       return json({ ok: true });
     }
@@ -92,26 +93,33 @@ export default {
         const raw = await env.SUBS.get(entry.name);
         if (!raw) continue;
         const s = JSON.parse(raw);
-        const local = new Date(Date.now() + (s.tz || 0) * 60000);
+        const now = Date.now();
+        const local = new Date(now + (s.tz || 0) * 60000);
         const localHour = local.getUTCHours();
         const localDay = local.toISOString().slice(0, 10);
-        if (localHour !== s.hour) continue;          // not their hour yet
-        if (s.lastReminder === localDay) continue;    // already reminded today
-        if (s.active === localDay) {                  // already played today -> skip but mark
-          s.lastReminder = localDay;
-          await env.SUBS.put(entry.name, JSON.stringify(s));
-          continue;
+        const since = (typeof s.lastReminder === 'number') ? (now - s.lastReminder) : Infinity;
+        const hrsFed = s.lastFed ? (now - s.lastFed) / 3600000 : null;
+
+        // pick the most urgent applicable reminder + how long to wait between sends
+        let msg = null, gapH = 0;
+        if (hrsFed != null && hrsFed >= 60) {
+          msg = { title: 'Critter Casino ⚠️', body: 'Your critters are STARVING and may start dying! Feed them now. 🐾' };
+          gapH = 6;
+        } else if (hrsFed != null && hrsFed >= 23) {
+          msg = { title: 'Critter Casino 🍖', body: 'Your critters are hungry — feed them to keep earning coins!' };
+          gapH = 12;
+        } else if (localHour === s.hour && s.active !== localDay) {
+          msg = { title: 'Critter Casino 🎲', body: 'Daily rewards & ranch coins are waiting. 🐾' };
+          gapH = 20;
         }
+        if (!msg || since < gapH * 3600000) continue;
+
         try {
-          const res = await sendPush(s, {
-            title: 'Critter Casino 🎲',
-            body: 'Your critters miss you! Daily rewards & ranch coins are waiting. 🐾',
-            url: './'
-          }, env);
+          const res = await sendPush(s, { title: msg.title, body: msg.body, url: './' }, env);
           if (res.status === 404 || res.status === 410) {
             await env.SUBS.delete(entry.name); // subscription gone
           } else {
-            s.lastReminder = localDay;
+            s.lastReminder = now;
             await env.SUBS.put(entry.name, JSON.stringify(s));
           }
         } catch (e) {

@@ -55,7 +55,8 @@
         subscription: sub.toJSON(),
         hour: getHour(),
         tz: -new Date().getTimezoneOffset(), // minutes east of UTC
-        active: localDay()
+        active: localDay(),
+        lastFed: (G.state && G.state.get().lastFed) || 0 // for feed reminders
       })
     });
   }

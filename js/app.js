@@ -342,6 +342,10 @@
     }
     if (G.push) G.push.heartbeat();
 
+    // hunger badge -> jump to Ranch to feed
+    const feedBadge = document.getElementById('feed-badge');
+    if (feedBadge) feedBadge.addEventListener('click', function () { navigate('ranch'); });
+
     // PWA install prompt
     let deferred = null;
     const installBtn = document.getElementById('install');

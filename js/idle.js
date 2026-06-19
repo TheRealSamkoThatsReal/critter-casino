@@ -37,8 +37,58 @@
     if (sp.tier >= 2) v *= rarityMult();
     return v * habitatMult() * G.state.prestigeMult();
   }
-  function incomePerSec() {
+  function rawIncomePerSec() {
     return G.state.get().inv.reduce(function (a, it) { return a + creatureIncome(it); }, 0);
+  }
+  // gated by hunger: hungry/starving creatures produce nothing
+  function incomePerSec() {
+    return fedState() === 'fed' ? rawIncomePerSec() : 0;
+  }
+
+  // ---- hunger / feeding ----------------------------------------------------
+  const FEED_MS = 24 * 3600 * 1000;    // income pauses after this long unfed
+  const STARVE_MS = 72 * 3600 * 1000;  // deaths begin after this long unfed
+  const DEATH_PER_HOUR = 0.03;         // per creature, each hour while starving
+
+  function msSinceFed() { const f = G.state.get().lastFed || Date.now(); return Math.max(0, Date.now() - f); }
+  function hoursSinceFed() { return msSinceFed() / 3600000; }
+  function fedState() {
+    const ms = msSinceFed();
+    if (ms >= STARVE_MS) return 'starving';
+    if (ms >= FEED_MS) return 'hungry';
+    return 'fed';
+  }
+
+  function feed() {
+    const s = G.state.get();
+    if (!s.inv.length) { toast('No creatures to feed.', ''); return; }
+    s.lastFed = Date.now();
+    s.lastDeathRoll = s.lastFed;
+    G.state.save();
+    G.ui.haptic(20);
+    toast('🍖 Fed your creatures! Income resumed.', 'good');
+    if (G.push && G.push.heartbeat) G.push.heartbeat(); // tell the server they're fed
+    render(document.getElementById('view'));
+    if (window.refreshAll) window.refreshAll();
+  }
+
+  // Apply hourly death rolls for any starving hours up to `now`. Returns # died.
+  function processStarvation(now) {
+    const s = G.state.get();
+    const starveStart = (s.lastFed || now) + STARVE_MS;
+    const from = Math.max(s.lastDeathRoll || 0, starveStart);
+    if (now <= from) return 0;
+    const hours = Math.floor((now - from) / 3600000);
+    if (hours <= 0) return 0;
+    let died = 0;
+    for (let h = 0; h < hours && s.inv.length; h++) {
+      for (let i = s.inv.length - 1; i >= 0; i--) {
+        if (Math.random() < DEATH_PER_HOUR) { s.inv.splice(i, 1); died++; }
+      }
+    }
+    s.lastDeathRoll = from + hours * 3600000;
+    if (died) G.state.save();
+    return died;
   }
 
   // ---- offline / ticking ---------------------------------------------------
@@ -47,19 +97,26 @@
     const now = Date.now();
     if (!s.lastTick) { s.lastTick = now; G.state.save(); return null; }
     const elapsed = Math.max(0, (now - s.lastTick) / 1000);
-    s.lastTick = now;
-    const capped = Math.min(elapsed, offlineCapSec());
-    const earned = incomePerSec() * capped;
+    // income only accrues while fed (lastFed .. lastFed+24h), capped by offline cap.
+    // computed BEFORE deaths, since starvation deaths happen after the fed window.
+    const fedUntil = (s.lastFed || now) + FEED_MS;
+    const capMs = offlineCapSec() * 1000;
+    const earnEnd = Math.min(now, fedUntil, s.lastTick + capMs);
+    const earnSec = Math.max(0, (earnEnd - s.lastTick) / 1000);
+    const earned = rawIncomePerSec() * earnSec;
     if (earned > 0) s.coins += earned;
+    s.lastTick = now;
+    const died = processStarvation(now); // also saves if any died
     G.state.save();
-    return { earned: earned, elapsed: elapsed, capped: capped };
+    return { earned: earned, elapsed: elapsed, capped: Math.min(elapsed, offlineCapSec()), died: died };
   }
 
   let iv = null, ticks = 0;
   function tick() {
     const s = G.state.get();
-    const inc = incomePerSec();
+    const inc = incomePerSec(); // 0 when hungry/starving
     if (inc > 0) s.coins += inc; // one second's worth
+    processStarvation(Date.now()); // acts only when a whole starving hour elapses
     ticks++;
     if (ticks % 10 === 0) { s.lastTick = Date.now(); G.state.save(); }
     updateLive();
@@ -70,17 +127,39 @@
     const s = G.state.get(); s.lastTick = Date.now(); G.state.save();
   }
 
+  function feedStatus() {
+    const st = fedState();
+    const ms = msSinceFed();
+    if (st === 'fed') return { cls: 'fed', icon: '🍖', text: 'Fed — hungry in ' + fmtDuration((FEED_MS - ms) / 1000) };
+    if (st === 'hungry') return { cls: 'hungry', icon: '🍽️', text: 'Hungry! Income paused — starving in ' + fmtDuration((STARVE_MS - ms) / 1000) };
+    return { cls: 'starving', icon: '💀', text: 'STARVING! Creatures may die each hour — feed now!' };
+  }
+
   function updateLive() {
+    const s = G.state.get();
     const coinEl = document.getElementById('coins');
-    if (coinEl) coinEl.textContent = fmt(G.state.get().coins);
+    if (coinEl) coinEl.textContent = fmt(s.coins);
+    const st = fedState();
     const inc = document.getElementById('idle-income');
-    if (inc) inc.textContent = '⛁ ' + fmtRate(incomePerSec()) + ' /s';
+    if (inc) inc.textContent = st === 'fed' ? ('⛁ ' + fmtRate(incomePerSec()) + ' /s') : '⛁ 0 /s 🍽️';
     const bal = document.getElementById('idle-balance');
-    if (bal) bal.textContent = '⛁ ' + fmt(G.state.get().coins);
+    if (bal) bal.textContent = '⛁ ' + fmt(s.coins);
     document.querySelectorAll('.idle-buy').forEach(function (b) {
       const c = +b.dataset.cost;
-      if (!isNaN(c)) b.disabled = G.state.get().coins < c;
+      if (!isNaN(c)) b.disabled = s.coins < c;
     });
+    // feeding status text + card class
+    const fs = feedStatus();
+    const fst = document.getElementById('feed-status');
+    if (fst) fst.textContent = fs.icon + ' ' + fs.text;
+    const fcard = document.getElementById('feed-card');
+    if (fcard) fcard.className = 'feed-card ' + fs.cls;
+    // topbar hunger badge
+    const fb = document.getElementById('feed-badge');
+    if (fb) {
+      if (!s.inv.length || st === 'fed') { fb.hidden = true; }
+      else { fb.hidden = false; fb.textContent = st === 'starving' ? '💀' : '🍖'; fb.className = 'feed-badge ' + st; }
+    }
   }
 
   // ---- offline welcome-back modal -----------------------------------------
@@ -94,14 +173,49 @@
   function offlineModal(res) {
     const node = el('div', { class: 'reveal' });
     node.appendChild(el('div', { class: 'reveal-head', text: '🏡 Welcome back!' }));
-    node.appendChild(el('div', { class: 'offline-earn', text: '⛁ ' + fmt(res.earned) }));
-    node.appendChild(el('div', { class: 'gsub', text:
-      'Your ranch earned this while you were away (' + fmtDuration(res.elapsed) +
-      (res.capped < res.elapsed ? ', capped at ' + fmtDuration(offlineCapSec()) : '') + ').' }));
+    if (res.earned >= 1) {
+      node.appendChild(el('div', { class: 'offline-earn', text: '⛁ ' + fmt(res.earned) }));
+      node.appendChild(el('div', { class: 'gsub', text:
+        'Earned while you were away (' + fmtDuration(res.elapsed) +
+        (res.capped < res.elapsed ? ', capped at ' + fmtDuration(offlineCapSec()) : '') + ').' }));
+    }
+    if (res.died > 0) {
+      node.appendChild(el('div', { class: 'gresult bad', text:
+        '💀 ' + res.died + ' creature' + (res.died > 1 ? 's' : '') + ' starved while you were away!' }));
+    }
+    const st = fedState();
+    if (st !== 'fed') {
+      node.appendChild(el('div', { class: 'gsub', text:
+        '⚠️ Your creatures are ' + (st === 'starving' ? 'STARVING and dying' : 'hungry and not earning') + '.' }));
+    }
     const m = G.ui.modal('', node);
-    node.appendChild(el('div', { class: 'gaction' }, [
-      el('button', { class: 'btn primary', text: 'Collect', onclick: function () { m.close(); } })
-    ]));
+    const acts = [];
+    if (st !== 'fed') {
+      acts.push(el('button', { class: 'btn primary', text: '🍖 Feed now', onclick: function () { feed(); m.close(); } }));
+      acts.push(el('button', { class: 'btn', text: 'Later', onclick: function () { m.close(); } }));
+    } else {
+      acts.push(el('button', { class: 'btn primary', text: 'Collect', onclick: function () { m.close(); } }));
+    }
+    node.appendChild(el('div', { class: 'gaction' }, acts));
+  }
+
+  // ---- feeding panel -------------------------------------------------------
+  function feedingPanel(container) {
+    const s = G.state.get();
+    if (!s.inv.length) return;
+    const fs = feedStatus();
+    const card = el('div', { id: 'feed-card', class: 'feed-card ' + fs.cls }, [
+      el('div', { class: 'feed-head' }, [
+        el('div', { class: 'feed-title', text: '🍖 Feeding' }),
+        el('div', { id: 'feed-status', class: 'feed-status', text: fs.icon + ' ' + fs.text })
+      ]),
+      el('div', { class: 'feed-sub', text:
+        'Feed your creatures every 24h to keep them earning. After 3 days unfed, they may start dying each hour.' }),
+      el('div', { class: 'gaction' }, [
+        el('button', { class: 'btn primary', text: '🍖 Feed all creatures', onclick: feed })
+      ])
+    ]);
+    container.appendChild(card);
   }
 
   // ---- buy -----------------------------------------------------------------
@@ -175,6 +289,7 @@
     container.appendChild(el('p', { class: 'view-sub', text:
       'Your creatures earn coins over time based on rarity — even while the app is closed. Spend coins on upgrades to earn faster.' }));
 
+    feedingPanel(container);
     prestigePanel(container);
 
     const s = G.state.get();
@@ -247,20 +362,24 @@
   }
 
   // ---- init ----------------------------------------------------------------
+  function shouldModal(res) {
+    return res && ((res.earned >= 1 && res.elapsed > 60) || res.died > 0);
+  }
   function init() {
     const res = collectOffline();
-    if (res && res.earned >= 1 && res.elapsed > 60) offlineModal(res);
+    if (shouldModal(res)) offlineModal(res);
     start();
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) { stop(); }
       else {
         const r = collectOffline();
-        if (r && r.earned >= 1 && r.elapsed > 60) offlineModal(r);
+        if (shouldModal(r)) offlineModal(r);
         start();
         updateLive();
       }
     });
   }
 
-  G.idle = { init: init, render: render, incomePerSec: incomePerSec, creatureIncome: creatureIncome, fmtRate: fmtRate };
+  G.idle = { init: init, render: render, incomePerSec: incomePerSec, creatureIncome: creatureIncome,
+    fmtRate: fmtRate, feed: feed, fedState: fedState };
 })(window.G = window.G || {});
