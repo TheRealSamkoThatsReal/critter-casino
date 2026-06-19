@@ -240,6 +240,11 @@ body {
   background: radial-gradient(circle at 50% 42%, rgba(108,92,255,.20), rgba(8,6,20,0) 68%); }
 .gaction { margin-top: 14px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .gaction .btn { min-width: 160px; }
+/* submit button pinned to the bottom of a long picker modal */
+.sticky-submit { position: sticky; bottom: 0; z-index: 3;
+  margin: 8px -16px -18px; padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(27,24,48,0), var(--bg2) 45%); }
+.sticky-submit .btn { min-width: 220px; }
 .gresult { font-size: 17px; font-weight: 800; }
 .gresult.good { color: var(--good); } .gresult.bad { color: var(--bad); }
 .gsub { font-size: 13px; color: var(--muted); margin-top: -4px; }

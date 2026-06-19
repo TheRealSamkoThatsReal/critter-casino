@@ -58,7 +58,7 @@
     const wrap = el('div', {}, [
       el('p', { class: 'gdesc', text: 'Tap creatures you want to give away, then create the offer code.' }),
       grid,
-      el('div', { class: 'gaction' }, [
+      el('div', { class: 'gaction sticky-submit' }, [
         el('button', { class: 'btn primary', text: 'Create offer code', onclick: make })
       ])
     ]);
@@ -147,7 +147,7 @@
       } }));
     });
     m.body.appendChild(myGrid);
-    m.body.appendChild(el('div', { class: 'gaction' }, [
+    m.body.appendChild(el('div', { class: 'gaction sticky-submit' }, [
       el('button', { class: 'btn primary', text: 'Accept trade', onclick: accept })
     ]));
     function accept() {

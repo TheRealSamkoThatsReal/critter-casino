@@ -91,7 +91,7 @@
       info, tools, grid
     ]);
     const m = G.ui.modal('Choose your wager', wrap);
-    wrap.appendChild(el('div', { class: 'gaction' }, [goBtn]));
+    wrap.appendChild(el('div', { class: 'gaction sticky-submit' }, [goBtn]));
     goBtn.addEventListener('click', function () {
       const items = Object.keys(selected).map(function (k) { return selected[k]; });
       if (!items.length) return;
