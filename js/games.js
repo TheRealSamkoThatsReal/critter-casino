@@ -326,7 +326,7 @@
     const stake = stakeOf(wager);
     const wrap = el('div', { class: 'game timing' });
     wrap.appendChild(el('p', { class: 'gdesc', html:
-      'Tap STOP when the marker hits the <b>center</b>. Bullseye pays ×5, near-misses less, edges lose.' }));
+      'Stop the marker on the tiny <b>center</b> bullseye for ×4. It moves fast — most taps miss.' }));
     const track = el('div', { class: 'tbar' });
     const marker = el('div', { class: 'tbar-marker' });
     track.appendChild(marker);
@@ -338,7 +338,7 @@
     const m = G.ui.modal('Bullseye', wrap, { onClose: function () { stopped = true; if (raf) cancelAnimationFrame(raf); } });
     function frame() {
       if (stopped) return;
-      pos += dir * 1.3;
+      pos += dir * 2.5;
       if (pos >= 100) { pos = 100; dir = -1; } else if (pos <= 0) { pos = 0; dir = 1; }
       marker.style.left = pos + '%';
       raf = requestAnimationFrame(frame);
@@ -348,7 +348,7 @@
       if (stopped) return; stopped = true; if (raf) cancelAnimationFrame(raf);
       G.ui.haptic(20); btn.disabled = true;
       const d = Math.abs(pos - 50);
-      const mult = d <= 4 ? 5 : d <= 12 ? 2.5 : d <= 25 ? 1.5 : 0;
+      const mult = d <= 1.5 ? 4 : d <= 5 ? 2 : d <= 12 ? 1.2 : 0;
       marker.classList.add(mult > 0 ? 'hit' : 'miss');
       setTimeout(function () {
         const res = resolve(wager, mult);
@@ -362,7 +362,7 @@
   function reaction(wager) {
     const wrap = el('div', { class: 'game reaction' });
     wrap.appendChild(el('p', { class: 'gdesc', html:
-      'When the box turns <b>GREEN</b>, tap as fast as you can. Tap too early and you lose!' }));
+      'When it turns <b>GREEN</b>, tap instantly. Under 200ms ×3 · 320ms ×2 · 450ms ×1.3 · slower loses. Tap early and you lose!' }));
     const pad = el('div', { class: 'react-pad waiting', text: 'Wait…' });
     wrap.appendChild(el('div', { class: 'gstage' }, [pad]));
     const action = el('div', { class: 'gaction' });
@@ -388,7 +388,7 @@
       else if (state === 'go') {
         const ms = Math.round(performance.now() - goAt);
         G.ui.haptic(20);
-        const mult = ms < 300 ? 4 : ms < 500 ? 2.5 : ms < 800 ? 1.5 : 0;
+        const mult = ms < 200 ? 3 : ms < 320 ? 2 : ms < 450 ? 1.3 : 0;
         done(mult, ms + 'ms' + (mult ? ' • ×' + mult : ' • too slow'));
       }
     });
@@ -399,7 +399,7 @@
   function memory(wager) {
     const wrap = el('div', { class: 'game memory' });
     wrap.appendChild(el('p', { class: 'gdesc', html:
-      'Watch the sequence, then repeat it. Get all four right for <b>×3</b> — one mistake loses.' }));
+      'Watch the 6-step sequence, then repeat it exactly for <b>×2.5</b>. One slip and you lose.' }));
     const padWrap = el('div', { class: 'mem-pads' });
     const COLORS = ['#ff5470', '#3d8bff', '#4caf50', '#ffd75e'];
     const pads = COLORS.map(function (c, i) {
@@ -413,11 +413,11 @@
     wrap.appendChild(action);
     let closed = false, accept = false, inputIdx = 0;
     const m = G.ui.modal('Echo', wrap, { onClose: function () { closed = true; } });
-    const seq = []; for (let i = 0; i < 4; i++) seq.push(Math.floor(Math.random() * 4));
+    const seq = []; for (let i = 0; i < 6; i++) seq.push(Math.floor(Math.random() * 4));
     function flash(i, cb) {
       if (closed) return;
       const p = pads[i]; p.classList.add('lit'); G.ui.haptic(10);
-      setTimeout(function () { p.classList.remove('lit'); setTimeout(cb, 170); }, 380);
+      setTimeout(function () { p.classList.remove('lit'); setTimeout(cb, 90); }, 270);
     }
     function playSeq(k) {
       if (closed) return;
@@ -428,7 +428,7 @@
     function finish(win) {
       accept = false;
       setTimeout(function () {
-        const res = resolve(wager, win ? 3 : 0);
+        const res = resolve(wager, win ? 2.5 : 0);
         showResult(res, action, function () { m.close(); memory2(); });
       }, 450);
     }
@@ -455,9 +455,9 @@
     { id: 'dice', name: 'High Roll', icon: '🎲', desc: 'Roll the dice — safer middle ground.', fn: dice2 }
   ];
   const SKILL = [
-    { id: 'timing', name: 'Bullseye', icon: '🎯', desc: 'Stop the marker on center. Up to ×5.', fn: timing2 },
-    { id: 'react', name: 'Quick Draw', icon: '⚡', desc: 'Tap the moment it turns green. Up to ×4.', fn: reaction2 },
-    { id: 'memory', name: 'Echo', icon: '🧠', desc: 'Repeat the sequence for ×3.', fn: memory2 }
+    { id: 'timing', name: 'Bullseye', icon: '🎯', desc: 'Nail the tiny fast-moving center. ×4.', fn: timing2 },
+    { id: 'react', name: 'Quick Draw', icon: '⚡', desc: 'Sub-200ms reaction for ×3.', fn: reaction2 },
+    { id: 'memory', name: 'Echo', icon: '🧠', desc: 'Repeat a 6-step sequence for ×2.5.', fn: memory2 }
   ];
 
   function tile(g) {
