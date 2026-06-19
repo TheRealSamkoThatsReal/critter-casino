@@ -40,12 +40,13 @@
       if (!iosSwitch) {
         const label = document.createElement('label');
         label.setAttribute('aria-hidden', 'true');
-        label.style.display = 'none';
+        // must be RENDERED (not display:none / not in <head>) or iOS skips the haptic
+        label.style.cssText = 'position:fixed;top:-50px;left:-50px;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden;';
         iosSwitch = document.createElement('input');
         iosSwitch.type = 'checkbox';
         iosSwitch.setAttribute('switch', '');
         label.appendChild(iosSwitch);
-        (document.body || document.documentElement).appendChild(label);
+        document.body.appendChild(label);
       }
       iosSwitch.click(); // toggles -> triggers the Taptic Engine on iOS 17.4+
     } catch (e) {}
