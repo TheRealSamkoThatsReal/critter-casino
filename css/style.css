@@ -435,3 +435,5 @@ body {
 .egg-name { font-weight: 800; font-size: 15px; }
 .egg-desc { font-size: 11.5px; color: var(--muted); line-height: 1.3; flex: 1; }
 .egg-tile .btn { margin-top: 6px; }
+.egg-mult { display: flex; gap: 6px; margin-top: 6px; }
+.egg-mult .btn { flex: 1; margin-top: 0; padding: 7px 4px; font-size: 11.5px; }

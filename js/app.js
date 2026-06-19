@@ -216,6 +216,56 @@
     refreshAll();
   }
 
+  // open N paid eggs at once and show a grouped summary (no per-egg suspense)
+  function multiHatch(egg, n) {
+    const s = G.state.get();
+    const total = egg.cost * n;
+    if (s.coins < total) { toast('Not enough coins.', 'bad'); return; }
+    G.state.addCoins(-total);
+    const results = [];
+    for (let i = 0; i < n; i++) {
+      const sp = G.state.randomSpecies(egg.min, egg.max);
+      if (!sp) break;
+      results.push(G.state.addSpecies(sp.id, Math.random() < egg.shiny));
+    }
+    s.stats.hatched += results.length;
+    G.state.save();
+    hatchSummary(results);
+    refreshAll();
+  }
+
+  function hatchSummary(results) {
+    if (!results.length) return;
+    let bestTier = 0;
+    results.forEach(function (it) { const sp = G.state.getSpecies(it.sid); if (sp && sp.tier > bestTier) bestTier = sp.tier; });
+    G.ui.haptic(bestTier >= 4 ? [25, 40, 30, 40, 80] : [15, 30, 50]);
+    if (G.fx) G.fx.celebrate(bestTier); // quick confetti/chime scaled to the rarest pull
+
+    // group identical (species + shiny) with counts
+    const groups = {};
+    results.forEach(function (it) {
+      const k = it.sid + (it.shiny ? '_s' : '');
+      if (!groups[k]) groups[k] = { item: it, count: 0 };
+      groups[k].count++;
+    });
+    const arr = Object.keys(groups).map(function (k) { return groups[k]; });
+    arr.sort(function (a, b) {
+      const sa = G.state.getSpecies(a.item.sid) || {}, sb = G.state.getSpecies(b.item.sid) || {};
+      return (sb.tier - sa.tier) || (b.item.shiny - a.item.shiny) || (sa.name || '').localeCompare(sb.name || '');
+    });
+    const node = el('div', {});
+    node.appendChild(el('div', { class: 'reveal-head', text: 'Hatched ×' + results.length + '!' }));
+    const grid = el('div', { class: 'grid pick-grid' });
+    arr.forEach(function (g) {
+      grid.appendChild(G.ui.card(g.item, { size: 56, showValue: false, badge: g.count > 1 ? ('×' + g.count) : null }));
+    });
+    node.appendChild(grid);
+    const m = G.ui.modal('', node);
+    node.appendChild(el('div', { class: 'gaction' }, [
+      el('button', { class: 'btn primary', text: 'Nice!', onclick: function () { m.close(); } })
+    ]));
+  }
+
   function cdLabel(ms) {
     const s = Math.ceil(ms / 1000);
     if (s >= 3600) return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm';
@@ -239,6 +289,17 @@
       btn.dataset.egg = egg.id;
       btn.addEventListener('click', function () { hatch(egg); renderHatch(container); });
       tile.appendChild(btn);
+      // paid eggs get bulk-hatch options to spend coins faster
+      if (egg.cost > 0) {
+        const mult = el('div', { class: 'egg-mult' });
+        [10, 100].forEach(function (n) {
+          const b = el('button', { class: 'btn small', text: '×' + n + ' ⛁' + fmt(egg.cost * n) });
+          b.disabled = G.state.get().coins < egg.cost * n;
+          b.addEventListener('click', function () { multiHatch(egg, n); renderHatch(container); });
+          mult.appendChild(b);
+        });
+        tile.appendChild(mult);
+      }
       grid.appendChild(tile);
     });
     container.appendChild(grid);

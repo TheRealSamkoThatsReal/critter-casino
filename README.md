@@ -28,8 +28,10 @@ with **no backend required**, hosted on GitHub Pages.
   deterministically from its id, so the roster can grow without art files.
   Includes ✨ shiny variants worth 5×.
 - **Hatch eggs** to grow your collection; sell duplicates for coins to buy
-  better eggs. A free **Daily Egg** gives a creature from any unlocked rarity,
-  favouring species you haven't collected yet (so it steadily fills your dex).
+  better eggs. Paid eggs support **bulk hatching (×10 / ×100)** with a grouped
+  results summary, to spend coins fast. A free **Daily Egg** gives a creature
+  from any unlocked rarity, favouring species you haven't collected yet (so it
+  steadily fills your dex).
 - **Critterdex view** in the Collection (Owned ⇄ Critterdex toggle): every
   species shown as a card — owned in full colour with counts, undiscovered as
   "???" silhouettes, and prestige-locked rarities as 🔒 silhouettes so you can
