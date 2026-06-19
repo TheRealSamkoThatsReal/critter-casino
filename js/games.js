@@ -18,8 +18,10 @@
     return t;
   }
 
-  // Resolve a wager with a payout multiplier (0 = total loss).
-  // Consumes the whole wager; on a win awards ONE creature worth up to stake*mult.
+  // Resolve a wager with a payout multiplier (0 = total loss). On a win the
+  // payout VALUE (stake*mult, divided by the prestige cost scale) is paid out as
+  // a set of creatures whose combined value matches it — so you actually receive
+  // roughly what the payout says, not one floored-down creature.
   function resolve(wager, mult) {
     const stake = stakeOf(wager);
     wager.forEach(function (it) { G.state.removeInstance(it.iid); });
@@ -29,16 +31,23 @@
       G.state.save();
       return { lost: true, count: wager.length, stake: stake };
     }
-    const target = Math.round(stake * mult);
-    // value buys a lower tier each prestige (costs scale up with progress)
-    let tier = tierForValue(target / G.state.progressScale());
-    if (Math.random() < 0.07) tier = Math.min(MAXT, tier + 1); // lucky crit
-    tier = Math.min(tier, G.state.maxTierUnlocked()); // rarities above are prestige-locked
-    const sp = G.state.randomSpeciesAtTier(tier) || G.state.randomSpeciesAtTier(0);
-    const inst = G.state.addSpecies(sp.id, shiny());
+    let budget = Math.round(stake * mult / G.state.progressScale());
+    if (Math.random() < 0.07) budget = Math.round(budget * 1.5); // lucky crit bonus
+    const cap = G.state.maxTierUnlocked(); // rarities above are prestige-locked
+    const items = [];
+    let remaining = budget, guard = 0;
+    while (remaining >= G.data.rarity(0).value && items.length < 20 && guard++ < 100) {
+      let tier = 0; // highest affordable (& unlocked) tier for the remaining budget
+      for (let t = 0; t <= cap; t++) if (G.data.rarity(t).value <= remaining) tier = t;
+      const sp = G.state.randomSpeciesAtTier(tier);
+      if (!sp) break;
+      items.push(G.state.addSpecies(sp.id, shiny()));
+      remaining -= G.data.rarity(tier).value;
+    }
+    if (!items.length) { const sp0 = G.state.randomSpeciesAtTier(0); if (sp0) items.push(G.state.addSpecies(sp0.id, false)); }
     G.state.get().stats.wins++;
     G.state.save();
-    return { item: inst, count: wager.length, stake: stake, mult: mult, target: target };
+    return { items: items, count: wager.length, stake: stake, mult: mult };
   }
 
   // ---- multi-creature wager picker ----------------------------------------
@@ -101,7 +110,9 @@
 
   // ---- shared result panel -------------------------------------------------
   function showResult(res, container, onAgain) {
-    const tier = res.lost ? -1 : (G.state.getSpecies(res.item.sid) || {}).tier;
+    const bestTier = res.lost ? -1 : res.items.reduce(function (m, it) {
+      const sp = G.state.getSpecies(it.sid); return sp && sp.tier > m ? sp.tier : m;
+    }, 0);
     function build() {
       container.innerHTML = '';
       G.ui.haptic(res.lost ? 180 : [25, 40, 30, 40, 80]);
@@ -109,20 +120,27 @@
         container.appendChild(el('div', { class: 'gresult bad', html:
           '💀 Lost! Your wager of ' + res.count + ' creature' + (res.count > 1 ? 's' : '') + ' (✨ ' + fmt(res.stake) + ') is gone.' }));
       } else {
-        const sp = G.state.getSpecies(res.item.sid);
-        const r = G.data.rarity(sp.tier);
-        if (G.fx) G.fx.celebrate(sp.tier);
+        if (G.fx) G.fx.celebrate(bestTier);
+        const wonVal = res.items.reduce(function (a, it) { return a + G.state.valueOf(it); }, 0);
         container.appendChild(el('div', { class: 'gresult good', html:
-          '🎉 ×' + res.mult + ' → won a <b>' + r.name + '</b>!' }));
-        container.appendChild(G.ui.card(res.item, { size: 84 }));
+          '🎉 ×' + res.mult + ' → won ' + res.items.length + ' creature' + (res.items.length > 1 ? 's' : '') + '!' }));
+        // group identical (species + shiny), rarest first
+        const groups = {};
+        res.items.forEach(function (it) { const k = it.sid + (it.shiny ? '_s' : ''); (groups[k] = groups[k] || { item: it, n: 0 }).n++; });
+        const arr = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) {
+          return (G.state.getSpecies(b.item.sid) || {}).tier - (G.state.getSpecies(a.item.sid) || {}).tier;
+        });
+        const grid = el('div', { class: 'grid pick-grid' });
+        arr.forEach(function (g) { grid.appendChild(G.ui.card(g.item, { size: 56, showValue: false, badge: g.n > 1 ? ('×' + g.n) : null })); });
+        container.appendChild(grid);
         container.appendChild(el('div', { class: 'gsub', html:
-          'Staked ✨ ' + fmt(res.stake) + ' → payout ✨ ' + fmt(res.target) }));
+          'Staked ✨ ' + fmt(res.stake) + ' → won ✨ ' + fmt(wonVal) }));
       }
       container.appendChild(el('button', { class: 'btn primary', text: 'Play again', onclick: onAgain }));
       if (window.refreshAll) window.refreshAll();
     }
     // suspenseful build-up before revealing a rare+ win
-    if (!res.lost && G.fx && tier >= 2) { container.innerHTML = ''; G.fx.suspense(tier, build); }
+    if (!res.lost && G.fx && bestTier >= 2) { container.innerHTML = ''; G.fx.suspense(bestTier, build); }
     else build();
   }
 
