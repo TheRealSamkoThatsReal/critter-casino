@@ -198,13 +198,13 @@
 
   function hatch(egg) {
     const s = G.state.get();
-    if (egg.cost > 0 && s.coins < egg.cost) { toast('Not enough coins.', 'bad'); return; }
+    if (egg.cost > 0 && s.coins < eggCost(egg)) { toast('Not enough coins.', 'bad'); return; }
     if (egg.cd) {
       const next = (s.cooldowns[egg.id] || 0);
       if (Date.now() < next) { toast('Free egg not ready yet.', 'bad'); return; }
       s.cooldowns[egg.id] = Date.now() + egg.cd;
     }
-    if (egg.cost > 0) G.state.addCoins(-egg.cost);
+    if (egg.cost > 0) G.state.addCoins(-eggCost(egg));
     const sp = egg.special === 'dex' ? G.state.dailyPick() : G.state.randomSpecies(egg.min, egg.max);
     if (!sp) { toast('No creatures available.', 'bad'); return; }
     const isShiny = Math.random() < egg.shiny;
@@ -216,10 +216,13 @@
     refreshAll();
   }
 
+  // egg prices rise each prestige (1.6^prestige)
+  function eggCost(egg) { return Math.round((egg.cost || 0) * G.state.progressScale()); }
+
   // open N paid eggs at once and show a grouped summary (no per-egg suspense)
   function multiHatch(egg, n) {
     const s = G.state.get();
-    const total = egg.cost * n;
+    const total = eggCost(egg) * n;
     if (s.coins < total) { toast('Not enough coins.', 'bad'); return; }
     G.state.addCoins(-total);
     const results = [];
@@ -294,7 +297,7 @@
       tile.appendChild(el('div', { class: 'egg-name', text: egg.name }));
       tile.appendChild(el('div', { class: 'egg-desc', text: egg.desc }));
       const btn = el('button', { class: 'btn primary' });
-      if (egg.cost > 0) btn.innerHTML = '⛁ ' + fmt(egg.cost);
+      if (egg.cost > 0) btn.innerHTML = '⛁ ' + fmt(eggCost(egg));
       else btn.textContent = 'Hatch';
       btn.dataset.egg = egg.id;
       btn.addEventListener('click', function () { hatch(egg); renderHatch(container); });
@@ -303,8 +306,9 @@
       if (egg.cost > 0) {
         const mult = el('div', { class: 'egg-mult' });
         [10, 100].forEach(function (n) {
-          const b = el('button', { class: 'btn small', text: '×' + n + ' ⛁' + fmt(egg.cost * n) });
-          b.disabled = G.state.get().coins < egg.cost * n;
+          const c = eggCost(egg) * n;
+          const b = el('button', { class: 'btn small', text: '×' + n + ' ⛁' + fmt(c) });
+          b.disabled = G.state.get().coins < c;
           b.addEventListener('click', function () { multiHatch(egg, n); renderHatch(container); });
           mult.appendChild(b);
         });

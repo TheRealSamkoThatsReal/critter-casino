@@ -189,6 +189,9 @@
   }
   function prestigeLevel() { return state.prestige || 0; }
   function prestigeMult() { return 1 + 0.5 * (state.prestige || 0); } // +50% income per prestige
+  // egg prices & casino value-to-tier scale up each prestige (outpaces income,
+  // so each prestige is harder than the last).
+  function progressScale() { return Math.pow(1.6, state.prestige || 0); }
 
   function doPrestige() {
     if (!canPrestige()) return false;
@@ -229,6 +232,7 @@
     canPrestige: canPrestige,
     prestigeLevel: prestigeLevel,
     prestigeMult: prestigeMult,
+    progressScale: progressScale,
     maxTierUnlocked: maxTierUnlocked,
     doPrestige: doPrestige
   };

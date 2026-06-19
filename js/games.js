@@ -30,7 +30,8 @@
       return { lost: true, count: wager.length, stake: stake };
     }
     const target = Math.round(stake * mult);
-    let tier = tierForValue(target);
+    // value buys a lower tier each prestige (costs scale up with progress)
+    let tier = tierForValue(target / G.state.progressScale());
     if (Math.random() < 0.07) tier = Math.min(MAXT, tier + 1); // lucky crit
     tier = Math.min(tier, G.state.maxTierUnlocked()); // rarities above are prestige-locked
     const sp = G.state.randomSpeciesAtTier(tier) || G.state.randomSpeciesAtTier(0);

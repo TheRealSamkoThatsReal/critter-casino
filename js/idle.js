@@ -295,6 +295,28 @@
     ]));
   }
 
+  // show the still-undiscovered creatures (up to the unlocked cap) as silhouettes
+  function showMissing() {
+    const cap = G.state.maxTierUnlocked();
+    const disc = G.state.get().discovered;
+    const missing = G.state.allSpecies().filter(function (sp) { return sp.tier <= cap && !disc[sp.id]; });
+    missing.sort(function (a, b) { return (a.tier - b.tier) || a.name.localeCompare(b.name); });
+    const node = el('div', {});
+    if (!missing.length) {
+      node.appendChild(el('p', { class: 'gdesc', text: 'You\'ve collected everything — you can prestige!' }));
+      G.ui.modal('Critterdex complete', node);
+      return;
+    }
+    node.appendChild(el('p', { class: 'gdesc', text:
+      'Discover these ' + missing.length + ' creature' + (missing.length !== 1 ? 's' : '') + ' to prestige:' }));
+    const grid = el('div', { class: 'grid pick-grid' });
+    missing.forEach(function (sp) {
+      grid.appendChild(G.ui.card({ iid: 'm', sid: sp.id, shiny: false }, { size: 54, silhouette: true, showValue: false }));
+    });
+    node.appendChild(grid);
+    G.ui.modal('Still needed (' + missing.length + ')', node);
+  }
+
   function prestigePanel(container) {
     const p = G.state.dexProgress();
     const level = G.state.prestigeLevel();
@@ -316,9 +338,8 @@
     card.appendChild(el('div', { class: 'pbar' }, [fill]));
     card.appendChild(el('div', { class: 'prestige-prog', text: 'Critterdex: ' + p.have + ' / ' + p.total + ' (' + pct + '%)' }));
     const btn = el('button', { class: 'btn primary',
-      text: ready ? (nxt ? '✨ Prestige → unlock ' + nxt : '✨ Prestige now') : '🔒 Collect them all to unlock' });
-    btn.disabled = !ready;
-    btn.addEventListener('click', confirmPrestige);
+      text: ready ? (nxt ? '✨ Prestige → unlock ' + nxt : '✨ Prestige now') : '🔍 See what\'s left' });
+    btn.addEventListener('click', function () { if (G.state.canPrestige()) confirmPrestige(); else showMissing(); });
     card.appendChild(el('div', { class: 'gaction' }, [btn]));
     container.appendChild(card);
   }
