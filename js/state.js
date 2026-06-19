@@ -25,6 +25,7 @@
     modsGained: 0,          // lifetime income modifiers grown (records)
     bmBuys: 0,              // black-market purchases this run (price escalation)
     eggBuys: {},            // paid-egg purchases per egg id this run (price escalation)
+    carryBudget: 0,         // casino payout left over past the per-game creature cap
     claimedMilestones: {},  // milestone amount -> 1
     stats: { hatched: 0, gambled: 0, wins: 0, losses: 0, traded: 0 },
     adminPass: 'admin',
@@ -317,6 +318,7 @@
     state.runCoinsEarned = 0;
     state.bmBuys = 0;
     state.eggBuys = {};
+    state.carryBudget = 0;
     state.upgrades = {};
     state.cooldowns = {};
     state.discovered = {};

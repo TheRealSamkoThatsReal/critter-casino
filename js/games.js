@@ -21,21 +21,27 @@
   // Resolve a wager with a payout multiplier (0 = total loss). On a win the
   // payout VALUE (stake*mult) is paid out as a set of creatures whose combined
   // value matches it — so you actually receive what the payout says.
+  const PAYOUT_CAP = 20; // max creatures awarded per game; leftover budget carries to the next game
   function resolve(wager, mult) {
+    const s = G.state.get();
     const stake = stakeOf(wager);
     wager.forEach(function (it) { G.state.removeInstance(it.iid); });
-    G.state.get().stats.gambled++;
+    s.stats.gambled++;
     if (!mult || mult <= 0) {
-      G.state.get().stats.losses++;
+      s.stats.losses++;
       G.state.save();
-      return { lost: true, count: wager.length, stake: stake };
+      // a loss doesn't touch carried winnings — they still wait for your next win
+      return { lost: true, count: wager.length, stake: stake, carried: s.carryBudget || 0 };
     }
     let budget = Math.round(stake * mult * G.state.casinoLuckMult()); // High Roller (Stardust) boosts payout
     if (Math.random() < 0.07) budget = Math.round(budget * 1.5); // lucky crit bonus
+    const usedCarry = s.carryBudget || 0;
+    budget += usedCarry;        // fold in any leftover carried from a previous game
+    s.carryBudget = 0;
     const cap = G.state.maxTierUnlocked(); // rarities above are prestige-locked
     const items = [];
-    let remaining = budget, guard = 0;
-    while (remaining >= G.data.rarity(0).value && items.length < 20 && guard++ < 100) {
+    let remaining = budget;
+    while (remaining >= G.data.rarity(0).value && items.length < PAYOUT_CAP) {
       let tier = 0; // highest affordable (& unlocked) tier for the remaining budget
       for (let t = 0; t <= cap; t++) if (G.data.rarity(t).value <= remaining) tier = t;
       const sp = G.state.randomSpeciesAtTier(tier);
@@ -44,9 +50,11 @@
       remaining -= G.data.rarity(tier).value;
     }
     if (!items.length) { const sp0 = G.state.randomSpeciesAtTier(0); if (sp0) items.push(G.state.addSpecies(sp0.id, false)); }
-    G.state.get().stats.wins++;
+    // anything past the cap carries into your next game so no payout is lost
+    s.carryBudget = Math.max(0, Math.round(remaining));
+    s.stats.wins++;
     G.state.save();
-    return { items: items, count: wager.length, stake: stake, mult: mult };
+    return { items: items, count: wager.length, stake: stake, mult: mult, carried: s.carryBudget, usedCarry: usedCarry };
   }
 
   // ---- multi-creature wager picker ----------------------------------------
@@ -119,6 +127,8 @@
       if (res.lost) {
         container.appendChild(el('div', { class: 'gresult bad', html:
           '💀 Lost! Your wager of ' + res.count + ' creature' + (res.count > 1 ? 's' : '') + ' (✨ ' + fmt(res.stake) + ') is gone.' }));
+        if (res.carried > 0) container.appendChild(el('div', { class: 'gsub', html:
+          '📦 You still have <b>✨ ' + fmt(res.carried) + '</b> carried over for your next win.' }));
       } else {
         if (G.fx) G.fx.celebrate(bestTier);
         const wonVal = res.items.reduce(function (a, it) { return a + G.state.valueOf(it); }, 0);
@@ -134,7 +144,10 @@
         arr.forEach(function (g) { grid.appendChild(G.ui.card(g.item, { size: 56, showValue: false, badge: g.n > 1 ? ('×' + g.n) : null })); });
         container.appendChild(grid);
         container.appendChild(el('div', { class: 'gsub', html:
-          'Staked ✨ ' + fmt(res.stake) + ' → won ✨ ' + fmt(wonVal) }));
+          'Staked ✨ ' + fmt(res.stake) + ' → won ✨ ' + fmt(wonVal) +
+          (res.usedCarry > 0 ? ' (incl. ✨ ' + fmt(res.usedCarry) + ' carried in)' : '') }));
+        if (res.carried > 0) container.appendChild(el('div', { class: 'gsub', html:
+          '📦 Hit the ' + res.items.length + '-creature cap — <b>✨ ' + fmt(res.carried) + '</b> carried to your next game!' }));
       }
       container.appendChild(el('button', { class: 'btn primary', text: 'Play again', onclick: onAgain }));
       if (window.refreshAll) window.refreshAll();
@@ -502,5 +515,5 @@
     container.appendChild(skill);
   }
 
-  G.games = { render: render };
+  G.games = { render: render, resolve: resolve };
 })(window.G = window.G || {});
