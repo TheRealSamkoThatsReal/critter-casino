@@ -74,10 +74,10 @@
     updateLive();
   }
 
-  // Hold-to-feed: must press & hold ~1.5s (progress fill + building rumble) so
+  // Hold-to-feed: must press & hold ~5s (progress fill + building rumble) so
   // you can't feed by reflex-tapping. Releasing early cancels.
   function wireHold(btn, fill, onComplete) {
-    const DUR = 1500;
+    const DUR = 5000;
     let raf = null, startTs = 0, holding = false, lastTick = 0;
     function reset() { holding = false; if (raf) cancelAnimationFrame(raf); raf = null; startTs = 0; fill.style.width = '0%'; btn.classList.remove('holding'); }
     function frame(ts) {
