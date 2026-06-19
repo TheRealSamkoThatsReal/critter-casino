@@ -29,36 +29,10 @@
     return String(n);
   }
 
-  // --- best-effort iOS haptic (EASY TO REMOVE) ------------------------------
-  // iOS Safari has no Vibration API. As a hack, toggling a hidden
-  // <input type="checkbox" switch> makes iOS 17.4+ play the system "switch"
-  // haptic (a single light tap — no patterns/intensity). To remove this
-  // entirely: delete iosSwitch/iosHaptic and the `else iosHaptic()` line below.
-  let iosSwitch = null;
-  function iosHaptic() {
-    try {
-      if (!iosSwitch) {
-        const label = document.createElement('label');
-        label.setAttribute('aria-hidden', 'true');
-        // must be RENDERED (not display:none / not in <head>) or iOS skips the haptic
-        label.style.cssText = 'position:fixed;top:-50px;left:-50px;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden;';
-        iosSwitch = document.createElement('input');
-        iosSwitch.type = 'checkbox';
-        iosSwitch.setAttribute('switch', '');
-        label.appendChild(iosSwitch);
-        document.body.appendChild(label);
-      }
-      iosSwitch.click(); // toggles -> triggers the Taptic Engine on iOS 17.4+
-    } catch (e) {}
-  }
-
-  // Haptic feedback. Android/Chromium use the Vibration API (patterns honored);
-  // iOS falls back to the light single-tap hack above.
+  // Haptic feedback via the Vibration API (Android/Chromium). Silently no-ops
+  // where unsupported, e.g. iOS Safari and desktop.
   function haptic(pattern) {
-    try {
-      if (navigator.vibrate) navigator.vibrate(pattern);
-      else iosHaptic();
-    } catch (e) {}
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
   }
 
   function toast(msg, kind) {
