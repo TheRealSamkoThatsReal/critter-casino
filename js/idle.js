@@ -325,7 +325,7 @@
   }
 
   // ---- Stardust (permanent meta-currency) ---------------------------------
-  function sdPct(def, level) { return Math.round(def.per * level * 100); }
+  function sdPct(def, level) { return Math.round(def.per * level * 1000) / 10; } // keeps 1 decimal (e.g. 0.5%)
   function sdEffectText(def, level) {
     if (def.id === 'nest') return level ? ('Keeping ' + sdPct(def, level) + '% of coins through prestige') : 'No coins kept through prestige yet';
     return level ? ('+' + sdPct(def, level) + '% ' + def.desc) : ('+0% ' + def.desc);
